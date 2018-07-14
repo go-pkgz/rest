@@ -1,0 +1,19 @@
+language: go
+
+go:
+  - "1.10.x"
+
+go_import_path: github.com/go-pkgz/rest
+
+services: mongodb
+
+before_install:
+  - cp -rf .vendor vendor
+  - go get github.com/mattn/goveralls
+
+before_script:
+  - sleep 3
+
+script:
+  - go test ./...
+  - $GOPATH/bin/goveralls -service=travis-ci
