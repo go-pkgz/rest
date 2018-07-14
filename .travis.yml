@@ -11,9 +11,6 @@ before_install:
   - cp -rf .vendor vendor
   - go get github.com/mattn/goveralls
 
-before_script:
-  - sleep 3
-
 script:
   - go test ./...
   - $GOPATH/bin/goveralls -service=travis-ci
