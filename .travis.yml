@@ -5,8 +5,6 @@ go:
 
 go_import_path: github.com/go-pkgz/rest
 
-services: mongodb
-
 before_install:
   - cp -rf .vendor vendor
   - go get github.com/mattn/goveralls
