@@ -39,8 +39,7 @@ func RenderJSONWithHTML(w http.ResponseWriter, r *http.Request, v interface{}) e
 
 	data, err := encodeJSONWithHTML(v)
 	if err != nil {
-		SendErrorJSON(w, r, http.StatusInternalServerError, err, "can't render json response")
-		return nil
+		return errors.Wrap(err, "json encoding failed")
 	}
 	return RenderJSONFromBytes(w, r, data)
 }
