@@ -36,7 +36,7 @@ func TestRest_RenderJSONWithHTML(t *testing.T) {
 	j1 := JSON{"key1": "val1", "key2": 2.0, "html": `<div> blah </div>`}
 	router.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		j := JSON{"key1": "val1", "key2": 2.0, "html": `<div> blah </div>`}
-		RenderJSONWithHTML(w, r, j)
+		require.Nil(t, RenderJSONWithHTML(w, r, j))
 	})
 	ts := httptest.NewServer(router)
 	defer ts.Close()
