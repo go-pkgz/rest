@@ -26,20 +26,21 @@ func RenderJSONFromBytes(w http.ResponseWriter, r *http.Request, data []byte) er
 
 // RenderJSONWithHTML allows html tags and forces charset=utf-8
 func RenderJSONWithHTML(w http.ResponseWriter, r *http.Request, v interface{}) {
+
+	encodeJSONWithHTML := func(v interface{}) ([]byte, error) {
+		buf := &bytes.Buffer{}
+		enc := json.NewEncoder(buf)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(v); err != nil {
+			return nil, errors.Wrap(err, "json encoding failed")
+		}
+		return buf.Bytes(), nil
+	}
+
 	data, err := encodeJSONWithHTML(v)
 	if err != nil {
 		SendErrorJSON(w, r, http.StatusInternalServerError, err, "can't render json response")
 		return
 	}
 	RenderJSONFromBytes(w, r, data)
-}
-
-func encodeJSONWithHTML(v interface{}) ([]byte, error) {
-	buf := &bytes.Buffer{}
-	enc := json.NewEncoder(buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(v); err != nil {
-		return nil, errors.Wrap(err, "json encoding failed")
-	}
-	return buf.Bytes(), nil
 }

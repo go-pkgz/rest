@@ -12,10 +12,9 @@ type uinfo struct {
 	name string
 }
 
-func (u uinfo) ID() string   { return u.id }
-func (u uinfo) Name() string { return u.name }
+func (u uinfo) String() string { return u.name + "/" + u.id }
 
-func TestGetUserInfo(t *testing.T) {
+func TestUser_GetAndSet(t *testing.T) {
 	r, err := http.NewRequest("GET", "http://blah.com", nil)
 	assert.Nil(t, err)
 	_, err = GetUserInfo(r)

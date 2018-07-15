@@ -3,15 +3,13 @@ package rest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 )
 
 type contextKey string
 
-type UserInfo interface {
-	ID() string
-	Name() string
-}
+type UserInfo fmt.Stringer
 
 // GetUserInfo returns user from request context
 func GetUserInfo(r *http.Request) (user UserInfo, err error) {

@@ -21,7 +21,7 @@ func SendErrorJSON(w http.ResponseWriter, r *http.Request, code int, err error, 
 func errDetailsMsg(r *http.Request, code int, err error, details string) string {
 	uinfoStr := ""
 	if user, e := GetUserInfo(r); e == nil {
-		uinfoStr = user.Name() + "/" + user.ID() + " - "
+		uinfoStr = user.String() + " - "
 	}
 	q := r.URL.String()
 	if qun, e := url.QueryUnescape(q); e == nil {

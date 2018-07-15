@@ -80,7 +80,7 @@ const maxBody = 1024
 var reMultWhtsp = regexp.MustCompile(`[\s\p{Zs}]{2,}`)
 
 // Logger middleware prints http log. Customized by set of LoggerFlag
-func Logger(ipFn func(ip string) string, flags ...LoggerFlag) func(http.Handler) http.Handler {
+func Logger(prefix string, ipFn func(ip string) string, flags ...LoggerFlag) func(http.Handler) http.Handler {
 
 	f := func(h http.Handler) http.Handler {
 
@@ -106,12 +106,13 @@ func Logger(ipFn func(ip string) string, flags ...LoggerFlag) func(http.Handler)
 				if strings.HasPrefix(r.RemoteAddr, "[") {
 					remoteIP = strings.Split(r.RemoteAddr, "]:")[0] + "]"
 				}
-				if ipFn != nil {
+
+				if ipFn != nil { // mask ip with ipFn
 					remoteIP = ipFn(remoteIP)
 				}
 
-				log.Printf("[INFO] REST %s - %s - %s - %d (%d) - %v %s %s",
-					r.Method, q, remoteIP, ww.Status(), ww.BytesWritten(), t2.Sub(t1), user, body)
+				log.Printf("%s %s - %s - %s - %d (%d) - %v %s %s",
+					prefix, r.Method, q, remoteIP, ww.Status(), ww.BytesWritten(), t2.Sub(t1), user, body)
 			}()
 
 			h.ServeHTTP(ww, r)
@@ -146,8 +147,8 @@ func getBodyAndUser(r *http.Request, flags []LoggerFlag) (body string, user stri
 
 	if inLogFlags(LogUser, flags) {
 		u, err := GetUserInfo(r)
-		if err == nil && u.Name() != "" {
-			user = fmt.Sprintf(" - %s %q", u.ID(), u.Name())
+		if err == nil && u.String() != "" {
+			user = fmt.Sprintf(" - %s", u.String())
 		}
 	}
 
