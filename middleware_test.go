@@ -64,6 +64,36 @@ func TestMiddleware_Ping(t *testing.T) {
 	assert.Equal(t, "blah blah", string(b))
 }
 
+func TestMiddleware_Recoverer(t *testing.T) {
+	buf := bytes.Buffer{}
+	log.SetOutput(&buf)
+
+	router := chi.NewRouter()
+	router.Get("/failed", func(w http.ResponseWriter, r *http.Request) {
+		panic("oh my!")
+	})
+	router.Get("/blah", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("blah blah"))
+	})
+
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/blah")
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, "blah blah", string(b))
+
+	//resp, err = http.Get(ts.URL + "/failed")
+	//t.Log(err.Error())
+	//require.NotNil(t, err)
+	//assert.Equal(t, 200, resp.StatusCode)
+}
+
 func TestMiddleware_Logger(t *testing.T) {
 	buf := bytes.Buffer{}
 	log.SetOutput(&buf)
