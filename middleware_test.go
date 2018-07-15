@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-chi/chi"
@@ -64,8 +65,31 @@ func TestMiddleware_Ping(t *testing.T) {
 	assert.Equal(t, "blah blah", string(b))
 }
 
+type lockedBuf struct {
+	buf  bytes.Buffer
+	lock sync.Mutex
+}
+
+func (b *lockedBuf) Write(p []byte) (int, error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuf) Read(p []byte) (int, error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.buf.Read(p)
+}
+
+func (b *lockedBuf) String() string {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.buf.String()
+}
+
 func TestMiddleware_Recoverer(t *testing.T) {
-	buf := bytes.Buffer{}
+	buf := lockedBuf{}
 	log.SetOutput(&buf)
 
 	router := chi.NewRouter()
@@ -80,18 +104,21 @@ func TestMiddleware_Recoverer(t *testing.T) {
 	ts := httptest.NewServer(router)
 	defer ts.Close()
 
-	resp, err := http.Get(ts.URL + "/blah")
+	resp, err := http.Get(ts.URL + "/failed")
+	t.Log(buf.String())
+	require.NotNil(t, err)
+	assert.Contains(t, buf.String(), " http: panic serving")
+	assert.Contains(t, buf.String(), "oh my!")
+	assert.Contains(t, buf.String(), "goroutine")
+	assert.Contains(t, buf.String(), "github.com/go-pkgz/rest.TestMiddleware_Recoverer")
+
+	resp, err = http.Get(ts.URL + "/blah")
 	require.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
-
-	//resp, err = http.Get(ts.URL + "/failed")
-	//t.Log(err.Error())
-	//require.NotNil(t, err)
-	//assert.Equal(t, 200, resp.StatusCode)
 }
 
 func TestMiddleware_Logger(t *testing.T) {
