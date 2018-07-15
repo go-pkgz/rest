@@ -1,7 +1,9 @@
 package rest
 
 import (
+	"bytes"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,6 +35,61 @@ func TestMiddleware_AppInfo(t *testing.T) {
 	assert.Equal(t, "app-name", resp.Header.Get("App-Name"))
 	assert.Equal(t, "12345", resp.Header.Get("App-Version"))
 	assert.Equal(t, "Umputun", resp.Header.Get("Org"))
+}
+
+func TestMiddleware_Ping(t *testing.T) {
+	router := chi.NewRouter()
+	router.Use(Ping)
+	router.Get("/blah", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("blah blah"))
+	})
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/ping")
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, "pong", string(b))
+
+	resp, err = http.Get(ts.URL + "/blah")
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	defer resp.Body.Close()
+	b, err = ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, "blah blah", string(b))
+}
+
+func TestMiddleware_Logger(t *testing.T) {
+	buf := bytes.Buffer{}
+	log.SetOutput(&buf)
+
+	router := chi.NewRouter()
+	router.Use(Logger("[INFO] REST", func(ip string) string {
+		return ip + "!masked"
+	}, LogAll))
+	router.Get("/blah", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("blah blah"))
+	})
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/blah")
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, "blah blah", string(b))
+
+	s := buf.String()
+	t.Log(s)
+	assert.True(t, strings.Contains(s, "[INFO] REST GET - /blah - 127.0.0.1!masked - 200 (9) -"))
 }
 
 func TestMiddleware_GetBodyAndUser(t *testing.T) {
