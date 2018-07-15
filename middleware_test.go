@@ -93,6 +93,7 @@ func TestMiddleware_Recoverer(t *testing.T) {
 	log.SetOutput(&buf)
 
 	router := chi.NewRouter()
+	router.Use(Recoverer)
 	router.Get("/failed", func(w http.ResponseWriter, r *http.Request) {
 		panic("oh my!")
 	})
@@ -105,12 +106,14 @@ func TestMiddleware_Recoverer(t *testing.T) {
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/failed")
-	t.Log(buf.String())
-	require.NotNil(t, err)
-	assert.Contains(t, buf.String(), " http: panic serving")
-	assert.Contains(t, buf.String(), "oh my!")
-	assert.Contains(t, buf.String(), "goroutine")
-	assert.Contains(t, buf.String(), "github.com/go-pkgz/rest.TestMiddleware_Recoverer")
+	s := buf.String()
+	t.Log("->> ", s)
+	require.NoError(t, err)
+	assert.Equal(t, 500, resp.StatusCode)
+
+	assert.Contains(t, s, "[WARN] request panic, oh my!")
+	assert.Contains(t, s, "goroutine")
+	assert.Contains(t, s, "github.com/go-pkgz/rest.TestMiddleware_Recoverer")
 
 	resp, err = http.Get(ts.URL + "/blah")
 	require.Nil(t, err)

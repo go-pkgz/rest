@@ -56,7 +56,7 @@ func Recoverer(next http.Handler) http.Handler {
 		defer func() {
 			if rvr := recover(); rvr != nil {
 				log.Printf("[WARN] request panic, %v", rvr)
-				debug.PrintStack()
+				log.Print(string(debug.Stack()))
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			}
 		}()

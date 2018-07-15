@@ -2,15 +2,15 @@
 
 ### AppInfo middleware
 
-Adds to every response header info
+Adds info to every response header:
 - App-Name - application name
 - App-Version - application version
 - Org - organization
-- M-Host - host name (from instance-level $MHOST env)
+- M-Host - host name from instance-level `$MHOST` env
 
 ### Ping-Pong middleware
 
-responds with `pong` on `GET /ping`. Also responds to anything with `/ping` suffix, like `/v2/ping` 
+Responds with `pong` on `GET /ping`. Also responds to anything with `/ping` suffix, like `/v2/ping` 
 
 example for both:
 
@@ -34,8 +34,6 @@ pong
 Logs all info about request, including user, method, status code, response size, url, elapsed time, request body (optional).
 Can be customized by passing flags - LogNone, LogAll, LogUser and LogBody. Flags can be combined (provided multiple times)
 
-Also hides from logged body any values for everything resembles passwords or other credentials.
-
 ### Recoverer middleware
 
 Recoverer is a middleware that recovers from panics, logs the panic (and a backtrace), 
@@ -43,5 +41,8 @@ and returns a HTTP 500 (Internal Server Error) status if possible.
 
 ### Helpers
 
-- `rest.JSON` is a map alias, just for convenience `type JSON map[string]interface{}`
-- `rest.RenderJSONFromBytes` render json response from []byte
+- `rest.JSON` - map alias, just for convenience `type JSON map[string]interface{}`
+- `rest.RenderJSONFromBytes` - renders json response from []byte
+- `rest.RenderJSONWithHTML` -  renders json response with html tags and forced `charset=utf-8`
+- `rest.SendErrorJSON` - makes `{error: blah, details: blah}` json body and responds with given error code. Also adds context to logged message
+
