@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 )
 
@@ -17,15 +16,11 @@ type UserInfo fmt.Stringer
 func GetUserInfo(r *http.Request) (user UserInfo, err error) {
 
 	ctx := r.Context()
-	if ctx == nil {
-		log.Print("!!!")
-		return nil, errors.New("no info about user")
-	}
 	if u, ok := ctx.Value(contextKey("user")).(UserInfo); ok {
 		return u, nil
 	}
 
-	return nil, errors.New("user can't be parsed")
+	return nil, errors.New("user can't extracted from ctx")
 }
 
 // SetUserInfo sets user into request context
