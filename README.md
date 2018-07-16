@@ -1,5 +1,11 @@
 ## REST helpers and middleware [![Build Status](https://travis-ci.org/go-pkgz/rest.svg?branch=master)](https://travis-ci.org/go-pkgz/rest) [![Coverage Status](https://coveralls.io/repos/github/go-pkgz/rest/badge.svg?branch=master)](https://coveralls.io/github/go-pkgz/rest?branch=master)
 
+## Install and update
+
+`go get -u github.com/go-pkgz/rest`
+
+## Middlewares 
+
 ### AppInfo middleware
 
 Adds info to every response header:
@@ -39,7 +45,7 @@ Can be customized by passing flags - LogNone, LogAll, LogUser and LogBody. Flags
 Recoverer is a middleware that recovers from panics, logs the panic (and a backtrace), 
 and returns a HTTP 500 (Internal Server Error) status if possible.
 
-### Helpers
+## Helpers
 
 - `rest.JSON` - map alias, just for convenience `type JSON map[string]interface{}`
 - `rest.RenderJSONFromBytes` - renders json response from []byte
