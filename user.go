@@ -9,14 +9,11 @@ import (
 
 type contextKey string
 
-// UserInfo wraps stringer and uses String to report user name, id and anything else implemented
-type UserInfo fmt.Stringer
-
 // GetUserInfo returns user from request context
-func GetUserInfo(r *http.Request) (user UserInfo, err error) {
+func GetUserInfo(r *http.Request) (user fmt.Stringer, err error) {
 
 	ctx := r.Context()
-	if u, ok := ctx.Value(contextKey("user")).(UserInfo); ok {
+	if u, ok := ctx.Value(contextKey("user")).(fmt.Stringer); ok {
 		return u, nil
 	}
 
@@ -24,7 +21,7 @@ func GetUserInfo(r *http.Request) (user UserInfo, err error) {
 }
 
 // SetUserInfo sets user into request context
-func SetUserInfo(r *http.Request, user UserInfo) *http.Request {
+func SetUserInfo(r *http.Request, user fmt.Stringer) *http.Request {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, contextKey("user"), user)
 	return r.WithContext(ctx)
