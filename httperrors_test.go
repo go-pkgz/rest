@@ -50,10 +50,9 @@ func TestErrorDetailsMsgWithUser(t *testing.T) {
 	callerFn := func() {
 		req, err := http.NewRequest("GET", "https://example.com/test?k1=v1&k2=v2", nil)
 		req.RemoteAddr = "127.0.0.1:1234"
-		req = SetUserInfo(req, uinfo{name: "test", id: "id"})
 		require.Nil(t, err)
 		msg := errDetailsMsg(req, 500, errors.New("error 500"), "error details 123456")
-		assert.Equal(t, "error details 123456 - error 500 - 500 - test/id - 127.0.0.1 - https://example.com/test?k1=v1&k2=v2 [caused by go-pkgz/rest/httperrors_test.go:58 rest.TestErrorDetailsMsgWithUser]", msg)
+		assert.Equal(t, "error details 123456 - error 500 - 500 - 127.0.0.1 - https://example.com/test?k1=v1&k2=v2 [caused by go-pkgz/rest/httperrors_test.go:57 rest.TestErrorDetailsMsgWithUser]", msg)
 	}
 	callerFn()
 }

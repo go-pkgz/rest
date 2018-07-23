@@ -1,19 +1,11 @@
 package rest
 
 import (
-	"bytes"
-	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
-	"regexp"
 	"runtime/debug"
 	"strings"
-	"time"
-
-	"github.com/go-chi/chi/middleware"
 )
 
 // AppInfo adds custom app-info to the response header
@@ -63,103 +55,4 @@ func Recoverer(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	}
 	return http.HandlerFunc(fn)
-}
-
-// LoggerFlag type
-type LoggerFlag int
-
-// logger flags enum
-const (
-	LogAll LoggerFlag = iota
-	LogUser
-	LogBody
-	LogNone
-)
-const maxBody = 1024
-
-var reMultWhtsp = regexp.MustCompile(`[\s\p{Zs}]{2,}`)
-
-// Logger middleware prints http log. Customized by set of LoggerFlag
-func Logger(prefix string, ipFn func(ip string) string, flags ...LoggerFlag) func(http.Handler) http.Handler {
-
-	f := func(h http.Handler) http.Handler {
-
-		fn := func(w http.ResponseWriter, r *http.Request) {
-
-			if inLogFlags(LogNone, flags) { // skip logging
-				h.ServeHTTP(w, r)
-				return
-			}
-
-			ww := middleware.NewWrapResponseWriter(w, 1)
-			body, user := getBodyAndUser(r, flags)
-			t1 := time.Now()
-			defer func() {
-				t2 := time.Now()
-
-				q := r.URL.String()
-				if qun, err := url.QueryUnescape(q); err == nil {
-					q = qun
-				}
-
-				remoteIP := strings.Split(r.RemoteAddr, ":")[0]
-				if strings.HasPrefix(r.RemoteAddr, "[") {
-					remoteIP = strings.Split(r.RemoteAddr, "]:")[0] + "]"
-				}
-
-				if ipFn != nil { // mask ip with ipFn
-					remoteIP = ipFn(remoteIP)
-				}
-
-				log.Printf("%s %s - %s - %s - %d (%d) - %v %s %s",
-					prefix, r.Method, q, remoteIP, ww.Status(), ww.BytesWritten(), t2.Sub(t1), user, body)
-			}()
-
-			h.ServeHTTP(ww, r)
-		}
-		return http.HandlerFunc(fn)
-	}
-
-	return f
-}
-
-func getBodyAndUser(r *http.Request, flags []LoggerFlag) (body string, user string) {
-	ctx := r.Context()
-	if ctx == nil {
-		return "", ""
-	}
-
-	if inLogFlags(LogBody, flags) {
-		if content, err := ioutil.ReadAll(r.Body); err == nil {
-			body = string(content)
-			r.Body = ioutil.NopCloser(bytes.NewReader(content))
-
-			if len(body) > 0 {
-				body = strings.Replace(body, "\n", " ", -1)
-				body = reMultWhtsp.ReplaceAllString(body, " ")
-			}
-
-			if len(body) > maxBody {
-				body = body[:maxBody] + "..."
-			}
-		}
-	}
-
-	if inLogFlags(LogUser, flags) {
-		u, err := GetUserInfo(r)
-		if err == nil && u.String() != "" {
-			user = fmt.Sprintf(" - %s", u.String())
-		}
-	}
-
-	return body, user
-}
-
-func inLogFlags(f LoggerFlag, flags []LoggerFlag) bool {
-	for _, flg := range flags {
-		if (flg == LogAll && f != LogNone) || flg == f {
-			return true
-		}
-	}
-	return false
 }

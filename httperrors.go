@@ -19,10 +19,7 @@ func SendErrorJSON(w http.ResponseWriter, r *http.Request, code int, err error, 
 }
 
 func errDetailsMsg(r *http.Request, code int, err error, details string) string {
-	uinfoStr := ""
-	if user, e := GetUserInfo(r); e == nil {
-		uinfoStr = user.String() + " - "
-	}
+
 	q := r.URL.String()
 	if qun, e := url.QueryUnescape(q); e == nil {
 		q = qun
@@ -40,5 +37,5 @@ func errDetailsMsg(r *http.Request, code int, err error, details string) string 
 	if pos := strings.Index(remoteIP, ":"); pos >= 0 {
 		remoteIP = remoteIP[:pos]
 	}
-	return fmt.Sprintf("%s - %v - %d - %s%s - %s%s", details, err, code, uinfoStr, remoteIP, q, srcFileInfo)
+	return fmt.Sprintf("%s - %v - %d - %s - %s%s", details, err, code, remoteIP, q, srcFileInfo)
 }

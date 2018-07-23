@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"sync"
 	"testing"
 
@@ -125,80 +124,4 @@ func TestMiddleware_Recoverer(t *testing.T) {
 	b, err := ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
-}
-
-func TestMiddleware_Logger(t *testing.T) {
-	buf := bytes.Buffer{}
-	log.SetOutput(&buf)
-
-	router := chi.NewRouter()
-	router.Use(Logger("[INFO] REST", func(ip string) string {
-		return ip + "!masked"
-	}, LogAll))
-	router.Get("/blah", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte("blah blah"))
-	})
-	ts := httptest.NewServer(router)
-	defer ts.Close()
-
-	resp, err := http.Get(ts.URL + "/blah")
-	require.Nil(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	assert.Equal(t, "blah blah", string(b))
-
-	s := buf.String()
-	t.Log(s)
-	assert.True(t, strings.Contains(s, "[INFO] REST GET - /blah - 127.0.0.1!masked - 200 (9) -"))
-}
-
-func TestMiddleware_LoggerNone(t *testing.T) {
-	buf := bytes.Buffer{}
-	log.SetOutput(&buf)
-
-	router := chi.NewRouter()
-	router.Use(Logger("[INFO] REST", nil, LogNone))
-	router.Get("/blah", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte("blah blah"))
-	})
-	ts := httptest.NewServer(router)
-	defer ts.Close()
-
-	resp, err := http.Get(ts.URL + "/blah")
-	require.Nil(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	assert.Equal(t, "blah blah", string(b))
-	assert.Equal(t, "", buf.String())
-}
-
-func TestMiddleware_GetBodyAndUser(t *testing.T) {
-	req, err := http.NewRequest("GET", "http://example.com/request", strings.NewReader("body"))
-	require.Nil(t, err)
-
-	body, user := getBodyAndUser(req, []LoggerFlag{LogAll})
-	assert.Equal(t, "body", body)
-	assert.Equal(t, "", user, "no user")
-
-	req = SetUserInfo(req, uinfo{id: "id1", name: "user1"})
-	_, user = getBodyAndUser(req, []LoggerFlag{LogAll})
-	assert.Equal(t, ` - user1/id1`, user, "no user")
-
-	body, user = getBodyAndUser(req, nil)
-	assert.Equal(t, "", body)
-	assert.Equal(t, "", user, "no user")
-
-	body, user = getBodyAndUser(req, []LoggerFlag{LogNone})
-	assert.Equal(t, "", body)
-	assert.Equal(t, "", user, "no user")
-
-	body, user = getBodyAndUser(req, []LoggerFlag{LogUser})
-	assert.Equal(t, "", body)
-	assert.Equal(t, ` - user1/id1`, user, "no user")
 }
