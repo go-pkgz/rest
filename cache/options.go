@@ -1,4 +1,4 @@
-package c
+package cache
 
 // Option func type
 type Option func(lc cacheWithOpts) error

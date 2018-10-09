@@ -1,4 +1,4 @@
-package c
+package cache
 
 import (
 	"testing"
