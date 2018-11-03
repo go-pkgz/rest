@@ -52,3 +52,6 @@ and returns a HTTP 500 (Internal Server Error) status if possible.
 - `rest.RenderJSONWithHTML` -  renders json response with html tags and forced `charset=utf-8`
 - `rest.SendErrorJSON` - makes `{error: blah, details: blah}` json body and responds with given error code. Also adds context to logged message
 
+## Caching
+
+Cache wrapper provides loading cache for rest/http responses. See [readme](https://github.com/go-pkgz/rest/tree/master/cache) for more details and examples.
