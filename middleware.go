@@ -9,10 +9,10 @@ import (
 )
 
 // AppInfo adds custom app-info to the response header
-func AppInfo(app string, org string, version string) func(http.Handler) http.Handler {
+func AppInfo(app string, author string, version string) func(http.Handler) http.Handler {
 	f := func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Org", org)
+			w.Header().Set("Author", author)
 			w.Header().Set("App-Name", app)
 			w.Header().Set("App-Version", version)
 			if mhost := os.Getenv("MHOST"); mhost != "" {

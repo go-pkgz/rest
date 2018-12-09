@@ -54,3 +54,10 @@ func TestRest_RenderJSONWithHTML(t *testing.T) {
 	assert.Equal(t, j1, j2)
 	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
 }
+
+func getTestHandlerBlah() http.HandlerFunc {
+	fn := func(rw http.ResponseWriter, req *http.Request) {
+		_, _ = rw.Write([]byte("blah"))
+	}
+	return http.HandlerFunc(fn)
+}
