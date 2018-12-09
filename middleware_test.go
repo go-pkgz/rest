@@ -36,7 +36,7 @@ func TestMiddleware_AppInfo(t *testing.T) {
 	assert.Equal(t, "blah blah", string(b))
 	assert.Equal(t, "app-name", resp.Header.Get("App-Name"))
 	assert.Equal(t, "12345", resp.Header.Get("App-Version"))
-	assert.Equal(t, "Umputun", resp.Header.Get("Org"))
+	assert.Equal(t, "Umputun", resp.Header.Get("Author"))
 	assert.Equal(t, "host1", resp.Header.Get("Host"))
 }
 
