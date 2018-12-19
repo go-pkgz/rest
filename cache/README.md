@@ -13,6 +13,17 @@ In addition to `Get` and `Flush` methods, memory cache also support limits for a
 
 `go get -u github.com/go-pkgz/rest/cache`
 
+## Technical details
+
+- Cache keeps data in a simple key:value format. 
+- Key is a type, created with `Key(site_id)` where `site_id` represents independent bucket in the cache. For simple cases can be set to an empty string.
+- Particular key set by `Key.ID(string)`
+- Key may contain optional scopes (list of string). They not affect retrieval and used for partial (scoped) invalidation only.
+- Cache is safe for concurrent use.
+- Value is []byte.
+- `Get` method returns from the cache if the key already in. Overwise executes passed function and saves results.
+- Special fake implementation `cache.Nop` satisfies `LoadingCache` interface and can be used to disable any caching
+
 ## Usage
 
 ```golang
