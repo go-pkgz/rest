@@ -45,6 +45,15 @@ Can be customized by passing flags - LogNone, LogAll, LogUser and LogBody. Flags
 Recoverer is a middleware that recovers from panics, logs the panic (and a backtrace), 
 and returns a HTTP 500 (Internal Server Error) status if possible.
 
+### OnlyFrom middleware
+
+OnlyFrom middleware allows access for limited list of source IPs.
+Such IPs can be defined as complete ip (like 192.168.1.12), prefix (129.168.) or CIDR (192.168.0.0/16)
+
+### Metrics middleware
+
+Metrics middleware responds to GET /metrics with list of [expvar](https://golang.org/pkg/expvar/). Optionally allows to restrict list of source ips.
+
 ## Helpers
 
 - `rest.JSON` - map alias, just for convenience `type JSON map[string]interface{}`
@@ -54,4 +63,4 @@ and returns a HTTP 500 (Internal Server Error) status if possible.
 
 ## Caching
 
-Cache wrapper provides loading cache for rest/http responses. See [readme](https://github.com/go-pkgz/rest/tree/master/cache) for more details and examples.
+Cache wrapper provides loading cache for rest/http responses. See [cache readme](https://github.com/go-pkgz/rest/tree/master/cache) for more details and examples.
