@@ -57,7 +57,8 @@ Metrics middleware responds to GET /metrics with list of [expvar](https://golang
 ## Helpers
 
 - `rest.JSON` - map alias, just for convenience `type JSON map[string]interface{}`
-- `rest.RenderJSONFromBytes` - renders json response from []byte
+- `rest.RenderJSON` -  renders json response from `interface{}`
+- `rest.RenderJSONFromBytes` - renders json response from `[]byte`
 - `rest.RenderJSONWithHTML` -  renders json response with html tags and forced `charset=utf-8`
 - `rest.SendErrorJSON` - makes `{error: blah, details: blah}` json body and responds with given error code. Also adds context to logged message
 
