@@ -6,12 +6,12 @@ go:
 go_import_path: github.com/go-pkgz/rest
 
 before_install:
-  - export GO111MODULE=on
   - go get github.com/mattn/goveralls
   - go get gopkg.in/alecthomas/gometalinter.v2
   - $GOPATH/bin/gometalinter.v2 --install
 
 script:
+  - export GO111MODULE=on
   - go get ./...
   - go mod vendor
   - go test ./...
