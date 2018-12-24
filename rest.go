@@ -23,7 +23,8 @@ func RenderJSON(w http.ResponseWriter, r *http.Request, data interface{}) {
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_, _ = w.Write(buf.Bytes())
+	w.Write(buf.Bytes()) // nolint: errcheck, gosec
+
 }
 
 // RenderJSONFromBytes sends binary data as json
