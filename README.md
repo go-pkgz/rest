@@ -54,6 +54,10 @@ Such IPs can be defined as complete ip (like 192.168.1.12), prefix (129.168.) or
 
 Metrics middleware responds to GET /metrics with list of [expvar](https://golang.org/pkg/expvar/). Optionally allows to restrict list of source ips.
 
+### BlackWords middleware
+
+BlackWords middleware doesn't allow user-defined words in the request body.
+
 ## Helpers
 
 - `rest.JSON` - map alias, just for convenience `type JSON map[string]interface{}`
