@@ -1,17 +1,17 @@
 package logger
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/go-chi/chi/middleware"
 )
 
 var reMultWhtsp = regexp.MustCompile(`[\s\p{Zs}]{2,}`)
@@ -59,13 +59,13 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
-		ww := middleware.NewWrapResponseWriter(w, 1)
+		ww := newCustomResponseWriter(w)
 		body, user := l.getBodyAndUser(r)
 		t1 := time.Now()
 		defer func() {
 			t2 := time.Now()
 
-			q := r.URL.String()
+			q := l.sanitizeQuery(r.URL.String())
 			if qun, err := url.QueryUnescape(q); err == nil {
 				q = qun
 			}
@@ -80,7 +80,7 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 			}
 
 			log.Printf("%s %s - %s - %s - %d (%d) - %v %s %s",
-				l.prefix, r.Method, q, remoteIP, ww.Status(), ww.BytesWritten(), t2.Sub(t1), user, body)
+				l.prefix, r.Method, q, remoteIP, ww.status, ww.size, t2.Sub(t1), user, body)
 		}()
 
 		next.ServeHTTP(ww, r)
@@ -127,4 +127,66 @@ func (l *Middleware) inLogFlags(f Flag) bool {
 		}
 	}
 	return false
+}
+
+func (l *Middleware) sanitizeQuery(inp string) string {
+	out := []rune(inp)
+	hide := []string{"password", "passwd", "secret", "credentials"}
+	for _, h := range hide {
+		if strings.Contains(strings.ToLower(inp), h+"=") {
+			stPos := strings.Index(strings.ToLower(inp), h+"=") + len(h) + 1
+			fnPos := strings.Index(inp[stPos:], "&")
+			if fnPos == -1 {
+				fnPos = len(inp)
+			} else {
+				fnPos = stPos + fnPos
+			}
+			for i := stPos; i < fnPos; i++ {
+				out[i] = rune('*')
+			}
+		}
+	}
+	return string(out)
+}
+
+// customResponseWriter implements ResponseWriter and keeping status and size
+type customResponseWriter struct {
+	http.ResponseWriter
+	status int
+	size   int
+}
+
+func newCustomResponseWriter(w http.ResponseWriter) *customResponseWriter {
+	return &customResponseWriter{
+		ResponseWriter: w,
+		status:         200,
+	}
+}
+
+// WriteHeader implements ResponseWriter and saves status
+func (c *customResponseWriter) WriteHeader(status int) {
+	c.status = status
+	c.ResponseWriter.WriteHeader(status)
+}
+
+// WriteHeader implements ResponseWriter and tracking size
+func (c *customResponseWriter) Write(b []byte) (int, error) {
+	size, err := c.ResponseWriter.Write(b)
+	c.size += size
+	return size, err
+}
+
+// Flush implements ResponseWriter
+func (c *customResponseWriter) Flush() {
+	if f, ok := c.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Hijack implements ResponseWriter
+func (c *customResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hj, ok := c.ResponseWriter.(http.Hijacker); ok {
+		return hj.Hijack()
+	}
+	return nil, nil, fmt.Errorf("ResponseWriter does not implement the Hijacker interface")
 }

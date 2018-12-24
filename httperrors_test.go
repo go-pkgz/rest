@@ -21,7 +21,6 @@ func TestSendErrorJSON(t *testing.T) {
 		}
 		w.WriteHeader(404)
 	}))
-
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/error")

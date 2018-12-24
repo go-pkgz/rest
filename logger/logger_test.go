@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +18,11 @@ func TestMiddleware_Logger(t *testing.T) {
 	buf := bytes.Buffer{}
 	log.SetOutput(&buf)
 
-	router := chi.NewRouter()
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+
 	l := New(Prefix("[INFO] REST"), Flags(All),
 		IPfn(func(ip string) string {
 			return ip + "!masked"
@@ -29,12 +32,7 @@ func TestMiddleware_Logger(t *testing.T) {
 		}),
 	)
 
-	router.Use(l.Handler)
-	router.Get("/blah", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte("blah blah"))
-	})
-	ts := httptest.NewServer(router)
+	ts := httptest.NewServer(l.Handler(handler))
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/blah")
@@ -55,14 +53,13 @@ func TestMiddleware_LoggerNone(t *testing.T) {
 	buf := bytes.Buffer{}
 	log.SetOutput(&buf)
 
-	l := New(Prefix("[INFO] REST"), Flags(None))
-	router := chi.NewRouter()
-	router.Use(l.Handler)
-	router.Get("/blah", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte("blah blah"))
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
 	})
-	ts := httptest.NewServer(router)
+
+	l := New(Prefix("[INFO] REST"), Flags(None))
+	ts := httptest.NewServer(l.Handler(handler))
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/blah")
@@ -101,4 +98,21 @@ func TestMiddleware_GetBodyAndUser(t *testing.T) {
 	body, user = l.getBodyAndUser(req)
 	assert.Equal(t, "", body)
 	assert.Equal(t, "", user, "no user")
+}
+
+func TestSanitizeReqURL(t *testing.T) {
+	tbl := []struct {
+		in  string
+		out string
+	}{
+		{"", ""},
+		{"/aa/bb?xyz=123", "/aa/bb?xyz=123"},
+		{"/aa/bb?xyz=123&secret=asdfghjk", "/aa/bb?xyz=123&secret=********"},
+		{"/aa/bb?xyz=123&secret=asdfghjk&key=val", "/aa/bb?xyz=123&secret=********&key=val"},
+		{"/aa/bb?xyz=123&secret=asdfghjk&key=val&password=1234", "/aa/bb?xyz=123&secret=********&key=val&password=****"},
+	}
+	l := New()
+	for i, tt := range tbl {
+		assert.Equal(t, tt.out, l.sanitizeQuery(tt.in), "check #%d, %s", i, tt.in)
+	}
 }
