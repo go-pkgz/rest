@@ -37,7 +37,7 @@ const (
 )
 
 // New makes rest Logger with given options
-func New(options ...Option) Middleware {
+func New(options ...Option) *Middleware {
 	res := Middleware{
 		prefix:      "",
 		maxBodySize: 1024,
@@ -46,7 +46,7 @@ func New(options ...Option) Middleware {
 	for _, opt := range options {
 		opt(&res)
 	}
-	return res
+	return &res
 }
 
 // Handler middleware prints http log
