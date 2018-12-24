@@ -15,7 +15,7 @@ func TestRest_RenderJSON(t *testing.T) {
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		j := JSON{"key1": 1, "key2": "222"}
-		require.NoError(t, RenderJSON(w, r, j))
+		RenderJSON(w, r, j)
 	}))
 	defer ts.Close()
 
@@ -27,7 +27,7 @@ func TestRest_RenderJSON(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	assert.Equal(t, `{"key1":1,"key2":"222"}`, string(body))
+	assert.Equal(t, `{"key1":1,"key2":"222"}`+"\n", string(body))
 	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
 }
 

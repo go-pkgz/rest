@@ -12,16 +12,18 @@ import (
 type JSON map[string]interface{}
 
 // RenderJSON sends data as json
-func RenderJSON(w http.ResponseWriter, r *http.Request, data interface{}) error {
-	b, err := json.Marshal(&data)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal data")
+func RenderJSON(w http.ResponseWriter, r *http.Request, data interface{}) {
+
+	buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(true)
+	if err := enc.Encode(data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if _, err := w.Write(b); err != nil {
-		return errors.Wrapf(err, "failed to send response to %s", r.RemoteAddr)
-	}
-	return nil
+	_, _ = w.Write(buf.Bytes())
 }
 
 // RenderJSONFromBytes sends binary data as json
