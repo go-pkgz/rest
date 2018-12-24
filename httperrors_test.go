@@ -32,7 +32,7 @@ func TestSendErrorJSON(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, 500, resp.StatusCode)
 
-	assert.Equal(t, `{"details":"error details 123456","error":"error 500"}`+"\n", string(body))
+	assert.Equal(t, `{"details":"error details 123456","error":"error 500"}`, string(body))
 }
 
 func TestErrorDetailsMsg(t *testing.T) {

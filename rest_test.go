@@ -7,17 +7,35 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func TestRest_RenderJSON(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		j := JSON{"key1": 1, "key2": "222"}
+		require.NoError(t, RenderJSON(w, r, j))
+	}))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/test")
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	require.NoError(t, err)
+	body, err := ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, `{"key1":1,"key2":"222"}`, string(body))
+	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+}
+
 func TestRest_RenderJSONFromBytes(t *testing.T) {
-	router := chi.NewRouter()
-	router.Get("/test", func(w http.ResponseWriter, r *http.Request) {
-		RenderJSONFromBytes(w, r, []byte("some data"))
-	})
-	ts := httptest.NewServer(router)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, RenderJSONFromBytes(w, r, []byte("some data")))
+	}))
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/test")
@@ -32,14 +50,14 @@ func TestRest_RenderJSONFromBytes(t *testing.T) {
 }
 
 func TestRest_RenderJSONWithHTML(t *testing.T) {
-	router := chi.NewRouter()
-	j1 := JSON{"key1": "val1", "key2": 2.0, "html": `<div> blah </div>`}
-	router.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		j := JSON{"key1": "val1", "key2": 2.0, "html": `<div> blah </div>`}
-		require.Nil(t, RenderJSONWithHTML(w, r, j))
-	})
-	ts := httptest.NewServer(router)
+		require.NoError(t, RenderJSONWithHTML(w, r, j))
+	}))
 	defer ts.Close()
+
+	j1 := JSON{"key1": "val1", "key2": 2.0, "html": `<div> blah </div>`}
 
 	resp, err := http.Get(ts.URL + "/test")
 	require.NoError(t, err)

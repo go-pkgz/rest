@@ -6,20 +6,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestOnlyFromAllowed(t *testing.T) {
 
-	router := chi.NewRouter()
-
-	router.With(OnlyFrom("127.0.0.1")).Get("/blah", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte("blah blah"))
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
 	})
-	ts := httptest.NewServer(router)
+	ts := httptest.NewServer(OnlyFrom("127.0.0.1")(handler))
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/blah")
@@ -34,12 +31,11 @@ func TestOnlyFromAllowed(t *testing.T) {
 
 func TestOnlyFromAllowedHeaders(t *testing.T) {
 
-	router := chi.NewRouter()
-	router.With(OnlyFrom("1.1.1.1")).Get("/blah", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte("blah blah"))
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
 	})
-	ts := httptest.NewServer(router)
+	ts := httptest.NewServer(OnlyFrom("1.1.1.1")(handler))
 	defer ts.Close()
 
 	reqWithHeader := func(header string) (*http.Request, error) {
@@ -76,12 +72,11 @@ func TestOnlyFromAllowedHeaders(t *testing.T) {
 
 func TestOnlyFromAllowedCIDR(t *testing.T) {
 
-	router := chi.NewRouter()
-	router.With(OnlyFrom("1.1.1.0/24")).Get("/blah", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte("blah blah"))
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
 	})
-	ts := httptest.NewServer(router)
+	ts := httptest.NewServer(OnlyFrom("1.1.1.0/24")(handler))
 	defer ts.Close()
 
 	client := http.Client{}
@@ -102,13 +97,11 @@ func TestOnlyFromAllowedCIDR(t *testing.T) {
 
 func TestOnlyFromRejected(t *testing.T) {
 
-	router := chi.NewRouter()
-
-	router.With(OnlyFrom("127.0.0.2")).Get("/blah", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte("blah blah"))
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
 	})
-	ts := httptest.NewServer(router)
+	ts := httptest.NewServer(OnlyFrom("127.0.0.2")(handler))
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/blah")

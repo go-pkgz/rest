@@ -5,19 +5,28 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/go-chi/render"
 	"github.com/pkg/errors"
 )
 
 // JSON is a map alias, just for convenience
 type JSON map[string]interface{}
 
+// RenderJSON sends data as json
+func RenderJSON(w http.ResponseWriter, r *http.Request, data interface{}) error {
+	b, err := json.Marshal(&data)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal data")
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if _, err := w.Write(b); err != nil {
+		return errors.Wrapf(err, "failed to send response to %s", r.RemoteAddr)
+	}
+	return nil
+}
+
 // RenderJSONFromBytes sends binary data as json
 func RenderJSONFromBytes(w http.ResponseWriter, r *http.Request, data []byte) error {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if status, ok := r.Context().Value(render.StatusCtxKey).(int); ok {
-		w.WriteHeader(status)
-	}
 	if _, err := w.Write(data); err != nil {
 		return errors.Wrapf(err, "failed to send response to %s", r.RemoteAddr)
 	}

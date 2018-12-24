@@ -5,8 +5,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-
-	"github.com/go-chi/render"
 )
 
 // OnlyFrom middleware allows access for limited list of source IPs.
@@ -23,8 +21,8 @@ func OnlyFrom(onlyIps ...string) func(http.Handler) http.Handler {
 				return
 			}
 
-			render.Status(r, http.StatusForbidden)
-			render.JSON(w, r, JSON{"error": fmt.Sprintf("ip %s rejected", ip)})
+			w.WriteHeader(http.StatusForbidden)
+			RenderJSON(w, r, JSON{"error": fmt.Sprintf("ip %s rejected", ip)})
 		}
 		return http.HandlerFunc(fn)
 	}

@@ -7,21 +7,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMetrics(t *testing.T) {
-
-	router := chi.NewRouter()
-	router.Use(Metrics("127.0.0.1"))
-	router.Get("/blah", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte("blah blah"))
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
 	})
-	ts := httptest.NewServer(router)
+	ts := httptest.NewServer(Metrics("127.0.0.1")(handler))
 	defer ts.Close()
+
 	resp, err := http.Get(ts.URL + "/metrics")
 	require.Nil(t, err)
 	defer resp.Body.Close()
@@ -34,14 +31,13 @@ func TestMetrics(t *testing.T) {
 }
 
 func TestMetricsRejected(t *testing.T) {
-	router := chi.NewRouter()
-	router.Use(Metrics("1.1.1.1"))
-	router.Get("/blah", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte("blah blah"))
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
 	})
-	ts := httptest.NewServer(router)
+	ts := httptest.NewServer(Metrics("1.1.1.1")(handler))
 	defer ts.Close()
+
 	resp, err := http.Get(ts.URL + "/metrics")
 	require.Nil(t, err)
 	defer resp.Body.Close()

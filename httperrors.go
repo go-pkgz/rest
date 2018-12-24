@@ -7,15 +7,13 @@ import (
 	"net/url"
 	"runtime"
 	"strings"
-
-	"github.com/go-chi/render"
 )
 
 // SendErrorJSON makes {error: blah, details: blah} json body and responds with error code
 func SendErrorJSON(w http.ResponseWriter, r *http.Request, code int, err error, details string) {
 	log.Printf("[DEBUG] %s", errDetailsMsg(r, code, err, details))
-	render.Status(r, code)
-	render.JSON(w, r, map[string]interface{}{"error": err.Error(), "details": details})
+	w.WriteHeader(code)
+	RenderJSON(w, r, map[string]interface{}{"error": err.Error(), "details": details})
 }
 
 func errDetailsMsg(r *http.Request, code int, err error, details string) string {
