@@ -12,7 +12,6 @@ import (
 )
 
 func TestSendErrorJSON(t *testing.T) {
-
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/error" {
 			t.Log("http err request", r.URL)
@@ -40,7 +39,7 @@ func TestErrorDetailsMsg(t *testing.T) {
 		require.Nil(t, err)
 		req.RemoteAddr = "1.2.3.4"
 		msg := errDetailsMsg(req, 500, errors.New("error 500"), "error details 123456")
-		assert.Equal(t, "error details 123456 - error 500 - 500 - 1.2.3.4 - https://example.com/test?k1=v1&k2=v2 [caused by go-pkgz/rest/httperrors_test.go:46 rest.TestErrorDetailsMsg]", msg)
+		assert.Equal(t, "error details 123456 - error 500 - 500 - 1.2.3.4 - https://example.com/test?k1=v1&k2=v2 [caused by go-pkgz/rest/httperrors_test.go:44 rest.TestErrorDetailsMsg]", msg)
 	}
 	callerFn()
 }
@@ -51,7 +50,7 @@ func TestErrorDetailsMsgWithUser(t *testing.T) {
 		req.RemoteAddr = "127.0.0.1:1234"
 		require.Nil(t, err)
 		msg := errDetailsMsg(req, 500, errors.New("error 500"), "error details 123456")
-		assert.Equal(t, "error details 123456 - error 500 - 500 - 127.0.0.1 - https://example.com/test?k1=v1&k2=v2 [caused by go-pkgz/rest/httperrors_test.go:57 rest.TestErrorDetailsMsgWithUser]", msg)
+		assert.Equal(t, "error details 123456 - error 500 - 500 - 127.0.0.1 - https://example.com/test?k1=v1&k2=v2 [caused by go-pkgz/rest/httperrors_test.go:55 rest.TestErrorDetailsMsgWithUser]", msg)
 	}
 	callerFn()
 }
