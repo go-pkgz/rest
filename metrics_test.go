@@ -32,3 +32,18 @@ func TestMetrics(t *testing.T) {
 	assert.True(t, strings.Contains(string(b), "cmdline"))
 	assert.True(t, strings.Contains(string(b), "memstats"))
 }
+
+func TestMetricsRejected(t *testing.T) {
+	router := chi.NewRouter()
+	router.Use(Metrics("1.1.1.1"))
+	router.Get("/blah", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("blah blah"))
+	})
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+	resp, err := http.Get(ts.URL + "/metrics")
+	require.Nil(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, 403, resp.StatusCode)
+}
