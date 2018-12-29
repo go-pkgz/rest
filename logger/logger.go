@@ -38,7 +38,7 @@ const (
 
 // Logger returns default logger middleware
 func Logger(next http.Handler) http.Handler {
-	l := New(Flags(All))
+	l := New(Flags(All), Prefix("[REST]"))
 	return l.Handler(next)
 
 }

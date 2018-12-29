@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMiddleware_Logger(t *testing.T) {
+func TestLogger(t *testing.T) {
 	buf := bytes.Buffer{}
 	log.SetOutput(&buf)
 
@@ -49,7 +49,31 @@ func TestMiddleware_Logger(t *testing.T) {
 	assert.True(t, strings.Contains(s, " - user"))
 }
 
-func TestMiddleware_LoggerNone(t *testing.T) {
+func TestLoggerDefault(t *testing.T) {
+	buf := bytes.Buffer{}
+	log.SetOutput(&buf)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+
+	ts := httptest.NewServer(Logger(handler))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/blah")
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, "blah blah", string(b))
+
+	s := buf.String()
+	t.Log(s)
+	assert.True(t, strings.Contains(s, "[REST] GET - /blah - 127.0.0.1 - 200 (9)"))
+}
+func TestLoggerNone(t *testing.T) {
 	buf := bytes.Buffer{}
 	log.SetOutput(&buf)
 
@@ -72,7 +96,7 @@ func TestMiddleware_LoggerNone(t *testing.T) {
 	assert.Equal(t, "", buf.String())
 }
 
-func TestMiddleware_GetBodyAndUser(t *testing.T) {
+func TestGetBodyAndUser(t *testing.T) {
 	req, err := http.NewRequest("GET", "http://example.com/request", strings.NewReader("body"))
 	require.Nil(t, err)
 	l := New()
