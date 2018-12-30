@@ -12,7 +12,7 @@ import (
 // SendError sends msg and status code
 func SendError(w http.ResponseWriter, code int, msg string) {
 	w.WriteHeader(code)
-	_, _ = w.Write([]byte(msg))
+	w.Write([]byte(msg))
 }
 
 // SendErrorJSON makes {error: blah, details: blah} json body and responds with error code
