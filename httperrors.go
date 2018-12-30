@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+// SendError sends msg and status code
+func SendError(w http.ResponseWriter, code int, msg string) {
+	w.WriteHeader(code)
+	_, _ = w.Write([]byte(msg))
+}
+
 // SendErrorJSON makes {error: blah, details: blah} json body and responds with error code
 func SendErrorJSON(w http.ResponseWriter, r *http.Request, code int, err error, details string) {
 	log.Printf("[DEBUG] %s", errDetailsMsg(r, code, err, details))
