@@ -11,7 +11,7 @@ import (
 )
 
 // SendError sends msg and status code
-func SendError(r *http.Request, w http.ResponseWriter, code int, msg string, trace bool) {
+func SendError(w http.ResponseWriter, r *http.Request, code int, msg string, trace bool) {
 	if trace {
 		log.Printf("[DEBUG] %s", errDetailsMsg(r, code, errors.New(msg), "error"))
 	}
