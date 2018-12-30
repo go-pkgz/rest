@@ -54,25 +54,3 @@ func TestErrorDetailsMsgWithUser(t *testing.T) {
 	}
 	callerFn()
 }
-
-func TestSendError(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/error" {
-			t.Log("http err request", r.URL)
-			SendError(w, r, 500, "error 123456", false)
-			return
-		}
-		w.WriteHeader(404)
-	}))
-	defer ts.Close()
-
-	resp, err := http.Get(ts.URL + "/error")
-	require.Nil(t, err)
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	require.Nil(t, err)
-	assert.Equal(t, 500, resp.StatusCode)
-
-	assert.Equal(t, "error 123456", string(body))
-}

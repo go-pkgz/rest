@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,23 +9,14 @@ import (
 	"strings"
 )
 
-// SendError sends msg and status code
-func SendError(w http.ResponseWriter, r *http.Request, code int, msg string, trace bool) {
-	if trace {
-		log.Printf("[DEBUG] %s", errDetailsMsg(r, code, errors.New(msg), "error"))
-	}
-	w.WriteHeader(code)
-	w.Write([]byte(msg)) // nolint: errcheck, gosec
-}
-
 // SendErrorJSON makes {error: blah, details: blah} json body and responds with error code
-func SendErrorJSON(w http.ResponseWriter, r *http.Request, code int, err error, details string) {
-	log.Printf("[DEBUG] %s", errDetailsMsg(r, code, err, details))
+func SendErrorJSON(w http.ResponseWriter, r *http.Request, code int, err error, msg string) {
+	log.Printf("[DEBUG] %s", errDetailsMsg(r, code, err, msg))
 	w.WriteHeader(code)
-	RenderJSON(w, r, map[string]interface{}{"error": err.Error(), "details": details})
+	RenderJSON(w, r, JSON{"error": msg})
 }
 
-func errDetailsMsg(r *http.Request, code int, err error, details string) string {
+func errDetailsMsg(r *http.Request, code int, err error, msg string) string {
 
 	q := r.URL.String()
 	if qun, e := url.QueryUnescape(q); e == nil {
@@ -45,5 +35,5 @@ func errDetailsMsg(r *http.Request, code int, err error, details string) string 
 	if pos := strings.Index(remoteIP, ":"); pos >= 0 {
 		remoteIP = remoteIP[:pos]
 	}
-	return fmt.Sprintf("%s - %v - %d - %s - %s%s", details, err, code, remoteIP, q, srcFileInfo)
+	return fmt.Sprintf("%s - %v - %d - %s - %s%s", msg, err, code, remoteIP, q, srcFileInfo)
 }
