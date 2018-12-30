@@ -59,7 +59,7 @@ func TestSendError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/error" {
 			t.Log("http err request", r.URL)
-			SendError(w, 500, "error 123456")
+			SendError(r, w, 500, "error 123456", false)
 			return
 		}
 		w.WriteHeader(404)

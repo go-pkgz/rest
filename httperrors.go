@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,9 +11,12 @@ import (
 )
 
 // SendError sends msg and status code
-func SendError(w http.ResponseWriter, code int, msg string) {
+func SendError(r *http.Request, w http.ResponseWriter, code int, msg string, trace bool) {
+	if trace {
+		log.Printf("[DEBUG] %s", errDetailsMsg(r, code, errors.New(msg), "error"))
+	}
 	w.WriteHeader(code)
-	w.Write([]byte(msg))
+	w.Write([]byte(msg)) // nolint: errcheck, gosec
 }
 
 // SendErrorJSON makes {error: blah, details: blah} json body and responds with error code
