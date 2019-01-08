@@ -3,11 +3,12 @@ package rest
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"runtime"
 	"strings"
+
+	log "github.com/go-pkgz/lgr"
 )
 
 // SendErrorJSON sends {error: msg} with error code and logging error and caller
