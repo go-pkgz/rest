@@ -3,12 +3,13 @@ package rest
 import (
 	"bytes"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"sync"
 	"testing"
+
+	log "github.com/go-pkgz/lgr"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -90,7 +91,7 @@ func (b *lockedBuf) String() string {
 
 func TestMiddleware_Recoverer(t *testing.T) {
 	buf := lockedBuf{}
-	log.SetOutput(&buf)
+	log.Setup(log.Out(&buf))
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/failed" {
@@ -108,7 +109,7 @@ func TestMiddleware_Recoverer(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 500, resp.StatusCode)
 
-	assert.Contains(t, s, "[WARN] request panic, oh my!")
+	assert.Contains(t, s, "WARN  request panic, oh my!")
 	assert.Contains(t, s, "goroutine")
 	assert.Contains(t, s, "github.com/go-pkgz/rest.TestMiddleware_Recoverer")
 
