@@ -8,12 +8,14 @@ import (
 	"runtime"
 	"strings"
 
-	log "github.com/go-pkgz/lgr"
+	"github.com/go-pkgz/rest/logger"
 )
 
 // SendErrorJSON sends {error: msg} with error code and logging error and caller
-func SendErrorJSON(w http.ResponseWriter, r *http.Request, code int, err error, msg string) {
-	log.Printf("[DEBUG] %s", errDetailsMsg(r, code, err, msg))
+func SendErrorJSON(w http.ResponseWriter, r *http.Request, l logger.Backend, code int, err error, msg string) {
+	if l != nil {
+		l.Logf("%s", errDetailsMsg(r, code, err, msg))
+	}
 	w.WriteHeader(code)
 	RenderJSON(w, r, JSON{"error": msg})
 }

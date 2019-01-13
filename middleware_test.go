@@ -2,14 +2,13 @@ package rest
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"sync"
 	"testing"
-
-	log "github.com/go-pkgz/lgr"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -90,8 +89,6 @@ func (b *lockedBuf) String() string {
 }
 
 func TestMiddleware_Recoverer(t *testing.T) {
-	buf := lockedBuf{}
-	log.Setup(log.Out(&buf))
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/failed" {
@@ -100,16 +97,17 @@ func TestMiddleware_Recoverer(t *testing.T) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
-	ts := httptest.NewServer(Recoverer(handler))
+	l := &mockLgr{}
+	ts := httptest.NewServer(Recoverer(l)(handler))
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/failed")
-	s := buf.String()
+	s := l.buf.String()
 	t.Log("->> ", s)
 	require.NoError(t, err)
 	assert.Equal(t, 500, resp.StatusCode)
 
-	assert.Contains(t, s, "WARN  request panic, oh my!")
+	assert.Contains(t, s, "request panic, oh my!")
 	assert.Contains(t, s, "goroutine")
 	assert.Contains(t, s, "github.com/go-pkgz/rest.TestMiddleware_Recoverer")
 
@@ -120,4 +118,12 @@ func TestMiddleware_Recoverer(t *testing.T) {
 	b, err := ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
+}
+
+type mockLgr struct {
+	buf bytes.Buffer
+}
+
+func (m *mockLgr) Logf(format string, args ...interface{}) {
+	m.buf.WriteString(fmt.Sprintf(format+"\n", args...))
 }
