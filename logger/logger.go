@@ -105,15 +105,25 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 				bld.WriteString(l.prefix)
 				bld.WriteString(" ")
 			}
+
+			bld.WriteString(fmt.Sprintf("%s - %s - %s - %d (%d) - %v", r.Method, q, remoteIP, ww.status, ww.size, t2.Sub(t1)))
+
+			if user != "" {
+				bld.WriteString(" - ")
+				bld.WriteString(user)
+			}
+
 			if l.subjFn != nil {
 				if subj, err := l.subjFn(r); err == nil {
-					bld.WriteString("(")
+					bld.WriteString(" - ")
 					bld.WriteString(subj)
-					bld.WriteString(") ")
 				}
 			}
-			bld.WriteString(fmt.Sprintf("%s - %s - %s - %d (%d) - %v %s %s",
-				r.Method, q, remoteIP, ww.status, ww.size, t2.Sub(t1), user, body))
+			if body != "" {
+				bld.WriteString(" - ")
+				bld.WriteString(body)
+			}
+
 			l.log.Logf("%s", bld.String())
 		}()
 
@@ -147,7 +157,7 @@ func (l *Middleware) getBodyAndUser(r *http.Request) (body string, user string) 
 	if l.inLogFlags(User) && l.userFn != nil {
 		u, err := l.userFn(r)
 		if err == nil && u != "" {
-			user = fmt.Sprintf(" - %s", u)
+			user = u
 		}
 	}
 

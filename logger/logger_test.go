@@ -38,7 +38,7 @@ func TestLogger(t *testing.T) {
 	ts := httptest.NewServer(l.Handler(handler))
 	defer ts.Close()
 
-	resp, err := http.Get(ts.URL + "/blah")
+	resp, err := http.Post(ts.URL+"/blah", "", bytes.NewBufferString("1234567890 abcdefg"))
 	require.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
@@ -48,8 +48,8 @@ func TestLogger(t *testing.T) {
 
 	s := lb.buf.String()
 	t.Log(s)
-	assert.True(t, strings.Contains(s, "[INFO] REST (subj) GET - /blah - 127.0.0.1!masked - 200 (9) -"), s)
-	assert.True(t, strings.Contains(s, " - user"), s)
+	assert.True(t, strings.Contains(s, "[INFO] REST POST - /blah - 127.0.0.1!masked - 200 (9) -"), s)
+	assert.True(t, strings.HasSuffix(s, "- user - subj - 1234567890 abcdefg"))
 }
 
 func TestLoggerMaxBodySize(t *testing.T) {
@@ -140,7 +140,7 @@ func TestGetBodyAndUser(t *testing.T) {
 		return "user1/id1", nil
 	}))
 	_, user = l.getBodyAndUser(req)
-	assert.Equal(t, ` - user1/id1`, user, "no user")
+	assert.Equal(t, `user1/id1`, user, "no user")
 
 	l = New(UserFn(func(r *http.Request) (string, error) {
 		return "", errors.New("err")
