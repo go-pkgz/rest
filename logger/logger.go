@@ -23,6 +23,7 @@ type Middleware struct {
 	flags       []Flag
 	ipFn        func(ip string) string
 	userFn      func(r *http.Request) (string, error)
+	subjFn      func(r *http.Request) (string, error)
 	log         Backend
 }
 
@@ -99,8 +100,21 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 				remoteIP = l.ipFn(remoteIP)
 			}
 
-			l.log.Logf("%s %s - %s - %s - %d (%d) - %v %s %s",
-				l.prefix, r.Method, q, remoteIP, ww.status, ww.size, t2.Sub(t1), user, body)
+			var bld strings.Builder
+			if l.prefix != "" {
+				bld.WriteString(l.prefix)
+				bld.WriteString(" ")
+			}
+			if l.subjFn != nil {
+				if subj, err := l.subjFn(r); err == nil {
+					bld.WriteString("(")
+					bld.WriteString(subj)
+					bld.WriteString(") ")
+				}
+			}
+			bld.WriteString(fmt.Sprintf("%s - %s - %s - %d (%d) - %v %s %s",
+				r.Method, q, remoteIP, ww.status, ww.size, t2.Sub(t1), user, body))
+			l.log.Logf("%s", bld.String())
 		}()
 
 		next.ServeHTTP(ww, r)

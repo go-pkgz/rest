@@ -30,6 +30,9 @@ func TestLogger(t *testing.T) {
 		UserFn(func(r *http.Request) (string, error) {
 			return "user", nil
 		}),
+		SubjFn(func(r *http.Request) (string, error) {
+			return "subj", nil
+		}),
 	)
 
 	ts := httptest.NewServer(l.Handler(handler))
@@ -45,7 +48,7 @@ func TestLogger(t *testing.T) {
 
 	s := lb.buf.String()
 	t.Log(s)
-	assert.True(t, strings.Contains(s, "[INFO] REST GET - /blah - 127.0.0.1!masked - 200 (9) -"), s)
+	assert.True(t, strings.Contains(s, "[INFO] REST (subj) GET - /blah - 127.0.0.1!masked - 200 (9) -"), s)
 	assert.True(t, strings.Contains(s, " - user"), s)
 }
 
