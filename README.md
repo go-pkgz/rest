@@ -61,7 +61,7 @@ BlackWords middleware doesn't allow user-defined words in the request body.
 
 ## Helpers
 
-- `rest.JSON` - map alias, just for convenience `type JSON map[string]interface{}`
+- `rest.JSON` - map alias, just for convenience `type JSON = map[string]interface{}`
 - `rest.RenderJSON` -  renders json response from `interface{}`
 - `rest.RenderJSONFromBytes` - renders json response from `[]byte`
 - `rest.RenderJSONWithHTML` -  renders json response with html tags and forced `charset=utf-8`

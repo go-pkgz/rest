@@ -9,7 +9,7 @@ import (
 )
 
 // JSON is a map alias, just for convenience
-type JSON map[string]interface{}
+type JSON = map[string]interface{}
 
 // RenderJSON sends data as json
 func RenderJSON(w http.ResponseWriter, r *http.Request, data interface{}) {
