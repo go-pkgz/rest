@@ -173,10 +173,11 @@ func (l *Middleware) inLogFlags(f Flag) bool {
 	return false
 }
 
+var hideWords = []string{"password", "passwd", "secret", "credentials"}
+
 func (l *Middleware) sanitizeQuery(inp string) string {
 	out := []rune(inp)
-	hide := []string{"password", "passwd", "secret", "credentials"}
-	for _, h := range hide {
+	for _, h := range hideWords {
 		if strings.Contains(strings.ToLower(inp), h+"=") {
 			stPos := strings.Index(strings.ToLower(inp), h+"=") + len(h) + 1
 			fnPos := strings.Index(inp[stPos:], "&")
