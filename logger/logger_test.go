@@ -52,6 +52,52 @@ func TestLogger(t *testing.T) {
 	assert.True(t, strings.HasSuffix(s, "- user - subj - 1234567890 abcdefg"))
 }
 
+func TestLoggerTraceID(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+
+	lb := &mockLgr{}
+	l := New(Prefix("[INFO] REST"), Flags(All),
+		Log(lb),
+		IPfn(func(ip string) string {
+			return ip + "!masked"
+		}),
+		UserFn(func(r *http.Request) (string, error) {
+			return "user", nil
+		}),
+		SubjFn(func(r *http.Request) (string, error) {
+			return "subj", nil
+		}),
+	)
+
+	ts := httptest.NewServer(l.Handler(handler))
+	defer ts.Close()
+
+	clint := http.Client{}
+	req, err := http.NewRequest("GET", ts.URL+"/blah", nil)
+	require.NoError(t, err)
+	req.Header.Set("X-Request-ID", "0000-reqid")
+	resp, err := clint.Do(req)
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+
+	s := lb.buf.String()
+	t.Log(s)
+	assert.True(t, strings.HasSuffix(s, "- user - subj - 0000-reqid"))
+
+	req, err = http.NewRequest("POST", ts.URL+"/blah", bytes.NewBufferString("1234567890 abcdefg"))
+	require.NoError(t, err)
+	req.Header.Set("X-Request-ID", "11111-reqid")
+	resp, err = clint.Do(req)
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	s = lb.buf.String()
+	t.Log(s)
+	assert.True(t, strings.HasSuffix(s, "- user - subj - 11111-reqid - 1234567890 abcdefg"))
+}
+
 func TestLoggerMaxBodySize(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

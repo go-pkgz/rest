@@ -119,6 +119,12 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 					bld.WriteString(subj)
 				}
 			}
+
+			if traceID := r.Header.Get("X-Request-ID"); traceID != "" {
+				bld.WriteString(" - ")
+				bld.WriteString(traceID)
+			}
+
 			if body != "" {
 				bld.WriteString(" - ")
 				bld.WriteString(body)
