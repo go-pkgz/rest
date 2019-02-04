@@ -13,7 +13,8 @@ type contextKey string
 
 const traceHeader = "X-Request-ID"
 
-// Trace looking for header X-Request-ID and makes it as uuid if not found, then populates it the result's header
+// Trace looks for header X-Request-ID and makes it as random id if not found, then populates it to the result's header
+// and to request context
 func Trace(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		traceID := r.Header.Get(traceHeader)
