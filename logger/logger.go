@@ -182,10 +182,10 @@ func (l *Middleware) inLogFlags(f Flag) bool {
 var hideWords = []string{"password", "passwd", "secret", "credentials"}
 
 func (l *Middleware) sanitizeQuery(inp string) string {
-	out := []rune(inp)
+	out := []byte(inp)
 	for _, h := range hideWords {
-		if strings.Contains(strings.ToLower(inp), h+"=") {
-			stPos := strings.Index(strings.ToLower(inp), h+"=") + len(h) + 1
+		if strings.Contains(toLowerLatin(inp), h+"=") {
+			stPos := strings.Index(toLowerLatin(inp), h+"=") + len(h) + 1
 			fnPos := strings.Index(inp[stPos:], "&")
 			if fnPos == -1 {
 				fnPos = len(inp)
@@ -193,8 +193,20 @@ func (l *Middleware) sanitizeQuery(inp string) string {
 				fnPos = stPos + fnPos
 			}
 			for i := stPos; i < fnPos; i++ {
-				out[i] = rune('*')
+				out[i] = byte('*')
 			}
+		}
+	}
+	return string(out)
+}
+
+// Lowercase the letters A-Z
+func toLowerLatin(s string) string {
+	out := []byte(s)
+	offset := byte('a' - 'A')
+	for i, ch := range out {
+		if (ch >= byte('A')) && (ch <= byte('Z')) {
+			out[i] = ch + offset
 		}
 	}
 	return string(out)

@@ -211,6 +211,8 @@ func TestSanitizeReqURL(t *testing.T) {
 		{"/aa/bb?xyz=123&secret=asdfghjk", "/aa/bb?xyz=123&secret=********"},
 		{"/aa/bb?xyz=123&secret=asdfghjk&key=val", "/aa/bb?xyz=123&secret=********&key=val"},
 		{"/aa/bb?xyz=123&secret=asdfghjk&key=val&password=1234", "/aa/bb?xyz=123&secret=********&key=val&password=****"},
+		{"/aa/bb?xyz=тест&password=1234", "/aa/bb?xyz=тест&password=****"},
+		{"/aa/bb?xyz=тест&password=1234&bar=buzz", "/aa/bb?xyz=тест&password=****&bar=buzz"},
 	}
 	l := New()
 	for i, tt := range tbl {
