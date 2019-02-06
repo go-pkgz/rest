@@ -207,13 +207,20 @@ func TestSanitizeReqURL(t *testing.T) {
 		out string
 	}{
 		{"", ""},
-		{"/aa/bb?xyz=123", "/aa/bb?xyz=123"},
-		{"/aa/bb?xyz=123&secret=asdfghjk", "/aa/bb?xyz=123&secret=********"},
-		{"/aa/bb?xyz=123&secret=asdfghjk&key=val", "/aa/bb?xyz=123&secret=********&key=val"},
-		{"/aa/bb?xyz=123&secret=asdfghjk&key=val&password=1234", "/aa/bb?xyz=123&secret=********&key=val&password=****"},
+		{"https://aaa.example.com:9090/aa/bb", "https://aaa.example.com:9090/aa/bb"},
+		{"https://aaa.example.com:9090/aa/bb?xyz=123", "https://aaa.example.com:9090/aa/bb?xyz=123"},
+		{"/aa/bb?xyz=123&seCret=asdfghjk", "/aa/bb?seCret=********&xyz=123"},
+		{"/aa/bb?xyz=123&secret=asdfghjk&key=val", "/aa/bb?key=val&secret=********&xyz=123"},
+		{"/aa/bb?xyz=123&secret=asdfghjk&key=val&password=1234", "/aa/bb?key=val&password=********&secret=********&xyz=123"},
+		{"/aa/bb?xyz=тест&passwoRD=1234", "/aa/bb?passwoRD=********&xyz=тест"},
+		{"/aa/bb?xyz=тест&password=1234&bar=buzz", "/aa/bb?bar=buzz&password=********&xyz=тест"},
+		{"/aa/bb?xyz=тест&password=пароль&bar=buzz", "/aa/bb?bar=buzz&password=********&xyz=тест"},
+		{"http://xyz.example.com/aa/bb?xyz=тест&password=пароль&bar=buzz&q=?sss?ccc", "http://xyz.example.com/aa/bb?bar=buzz&password=********&q=?sss?ccc&xyz=тест"},
 	}
 	l := New()
 	for i, tt := range tbl {
-		assert.Equal(t, tt.out, l.sanitizeQuery(tt.in), "check #%d, %s", i, tt.in)
+		t.Run(tt.in, func(t *testing.T) {
+			assert.Equal(t, tt.out, l.sanitizeQuery(tt.in), "check #%d, %s", i, tt.in)
+		})
 	}
 }

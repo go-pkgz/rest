@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -179,25 +180,40 @@ func (l *Middleware) inLogFlags(f Flag) bool {
 	return false
 }
 
-var hideWords = []string{"password", "passwd", "secret", "credentials"}
+var hideWords = []string{"password", "passwd", "secret", "credentials", "token"}
 
+// hide query values for hideWords. May change order of query params
 func (l *Middleware) sanitizeQuery(inp string) string {
-	out := []rune(inp)
-	for _, h := range hideWords {
-		if strings.Contains(strings.ToLower(inp), h+"=") {
-			stPos := strings.Index(strings.ToLower(inp), h+"=") + len(h) + 1
-			fnPos := strings.Index(inp[stPos:], "&")
-			if fnPos == -1 {
-				fnPos = len(inp)
-			} else {
-				fnPos = stPos + fnPos
-			}
-			for i := stPos; i < fnPos; i++ {
-				out[i] = rune('*')
+
+	inHiddenWords := func(str string) bool {
+		for _, w := range hideWords {
+			if strings.EqualFold(w, str) {
+				return true
 			}
 		}
+		return false
 	}
-	return string(out)
+
+	parts := strings.SplitN(inp, "?", 2)
+	if len(parts) < 2 {
+		return inp
+	}
+
+	q, e := url.ParseQuery(parts[1])
+	if e != nil || len(q) == 0 {
+		return inp
+	}
+
+	res := []string{}
+	for k, v := range q {
+		if inHiddenWords(k) {
+			res = append(res, fmt.Sprintf("%s=********", k))
+		} else {
+			res = append(res, fmt.Sprintf("%s=%v", k, v[0]))
+		}
+	}
+	sort.Strings(res) // to make testing persistent
+	return parts[0] + "?" + strings.Join(res, "&")
 }
 
 // customResponseWriter implements ResponseWriter and keeping status and size
