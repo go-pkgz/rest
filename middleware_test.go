@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -63,29 +62,6 @@ func TestMiddleware_Ping(t *testing.T) {
 	b, err = ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
-}
-
-type lockedBuf struct {
-	buf  bytes.Buffer
-	lock sync.Mutex
-}
-
-func (b *lockedBuf) Write(p []byte) (int, error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	return b.buf.Write(p)
-}
-
-func (b *lockedBuf) Read(p []byte) (int, error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	return b.buf.Read(p)
-}
-
-func (b *lockedBuf) String() string {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	return b.buf.String()
 }
 
 func TestMiddleware_Recoverer(t *testing.T) {
