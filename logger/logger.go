@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 )
@@ -87,9 +86,11 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 		defer func() {
 			t2 := time.Now()
 
-			q := l.sanitizeQuery(r.URL.String())
-			if qun, err := url.QueryUnescape(q); err == nil {
-				q = qun
+			u := *r.URL // shallow copy
+			u.RawQuery = l.sanitizeQuery(u.RawQuery)
+			rawurl := u.String()
+			if unescURL, err := url.QueryUnescape(rawurl); err == nil {
+				rawurl = unescURL
 			}
 
 			remoteIP := strings.Split(r.RemoteAddr, ":")[0]
@@ -107,7 +108,7 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 				bld.WriteString(" ")
 			}
 
-			bld.WriteString(fmt.Sprintf("%s - %s - %s - %d (%d) - %v", r.Method, q, remoteIP, ww.status, ww.size, t2.Sub(t1)))
+			bld.WriteString(fmt.Sprintf("%s - %s - %s - %d (%d) - %v", r.Method, rawurl, remoteIP, ww.status, ww.size, t2.Sub(t1)))
 
 			if user != "" {
 				bld.WriteString(" - ")
@@ -180,40 +181,39 @@ func (l *Middleware) inLogFlags(f Flag) bool {
 	return false
 }
 
-var hideWords = []string{"password", "passwd", "secret", "credentials", "token"}
+var keysToHide = []string{"password", "passwd", "secret", "credentials", "token"}
 
-// hide query values for hideWords. May change order of query params
-func (l *Middleware) sanitizeQuery(inp string) string {
+// Hide query values for keysToHide. May change order of query params.
+// May escape unescaped query params.
+func (l *Middleware) sanitizeQuery(query string) string {
+	// note that we skip non-nil error further
+	v, err := url.ParseQuery(query)
 
-	inHiddenWords := func(str string) bool {
-		for _, w := range hideWords {
-			if strings.EqualFold(w, str) {
+	isHidden := func(key string) bool {
+		for _, k := range keysToHide {
+			if strings.EqualFold(k, key) {
 				return true
 			}
 		}
 		return false
 	}
 
-	parts := strings.SplitN(inp, "?", 2)
-	if len(parts) < 2 {
-		return inp
-	}
-
-	q, e := url.ParseQuery(parts[1])
-	if e != nil || len(q) == 0 {
-		return inp
-	}
-
-	res := []string{}
-	for k, v := range q {
-		if inHiddenWords(k) {
-			res = append(res, fmt.Sprintf("%s=********", k))
-		} else {
-			res = append(res, fmt.Sprintf("%s=%v", k, v[0]))
+	present := false
+	for key, vs := range v {
+		if isHidden(key) {
+			present = true
+			for i := range vs {
+				vs[i] = "........"
+			}
 		}
 	}
-	sort.Strings(res) // to make testing persistent
-	return parts[0] + "?" + strings.Join(res, "&")
+
+	// short circuit
+	if (err == nil) && !present {
+		return query
+	}
+
+	return v.Encode()
 }
 
 // customResponseWriter implements ResponseWriter and keeping status and size

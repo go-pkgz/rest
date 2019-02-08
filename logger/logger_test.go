@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -207,20 +208,25 @@ func TestSanitizeReqURL(t *testing.T) {
 		out string
 	}{
 		{"", ""},
-		{"https://aaa.example.com:9090/aa/bb", "https://aaa.example.com:9090/aa/bb"},
-		{"https://aaa.example.com:9090/aa/bb?xyz=123", "https://aaa.example.com:9090/aa/bb?xyz=123"},
-		{"/aa/bb?xyz=123&seCret=asdfghjk", "/aa/bb?seCret=********&xyz=123"},
-		{"/aa/bb?xyz=123&secret=asdfghjk&key=val", "/aa/bb?key=val&secret=********&xyz=123"},
-		{"/aa/bb?xyz=123&secret=asdfghjk&key=val&password=1234", "/aa/bb?key=val&password=********&secret=********&xyz=123"},
-		{"/aa/bb?xyz=тест&passwoRD=1234", "/aa/bb?passwoRD=********&xyz=тест"},
-		{"/aa/bb?xyz=тест&password=1234&bar=buzz", "/aa/bb?bar=buzz&password=********&xyz=тест"},
-		{"/aa/bb?xyz=тест&password=пароль&bar=buzz", "/aa/bb?bar=buzz&password=********&xyz=тест"},
-		{"http://xyz.example.com/aa/bb?xyz=тест&password=пароль&bar=buzz&q=?sss?ccc", "http://xyz.example.com/aa/bb?bar=buzz&password=********&q=?sss?ccc&xyz=тест"},
+		{"xyz=123", "xyz=123"},
+		{"foo=bar&foo=buzz", "foo=bar&foo=buzz"},
+		{"foo=%2&password=1234", "password=........"},
+		{"xyz=123&seCret=asdfghjk", "seCret=........&xyz=123"},
+		{"xyz=123&secret=asdfghjk&key=val", "key=val&secret=........&xyz=123"},
+		{"xyz=123&secret=asdfghjk&key=val&password=1234", "key=val&password=........&secret=........&xyz=123"},
+		{"xyz=тест&passwoRD=1234", "passwoRD=........&xyz=тест"},
+		{"xyz=тест&password=1234&bar=buzz", "bar=buzz&password=........&xyz=тест"},
+		{"xyz=тест&password=пароль&bar=buzz", "bar=buzz&password=........&xyz=тест"},
+		{"xyz=тест&password=пароль&bar=buzz&q=?sss?ccc", "bar=buzz&password=........&q=?sss?ccc&xyz=тест"},
+	}
+	unesc := func(s string) string {
+		s, _ = url.QueryUnescape(s)
+		return s
 	}
 	l := New()
 	for i, tt := range tbl {
 		t.Run(tt.in, func(t *testing.T) {
-			assert.Equal(t, tt.out, l.sanitizeQuery(tt.in), "check #%d, %s", i, tt.in)
+			assert.Equal(t, tt.out, unesc(l.sanitizeQuery(tt.in)), "check #%d, %s", i, tt.in)
 		})
 	}
 }
