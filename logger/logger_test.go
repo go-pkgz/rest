@@ -39,7 +39,7 @@ func TestLogger(t *testing.T) {
 	ts := httptest.NewServer(l.Handler(handler))
 	defer ts.Close()
 
-	resp, err := http.Post(ts.URL+"/blah", "", bytes.NewBufferString("1234567890 abcdefg"))
+	resp, err := http.Post(ts.URL+"/blah?password=secret&key=val&var=123", "", bytes.NewBufferString("1234567890 abcdefg"))
 	require.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
@@ -49,7 +49,7 @@ func TestLogger(t *testing.T) {
 
 	s := lb.buf.String()
 	t.Log(s)
-	assert.True(t, strings.Contains(s, "[INFO] REST POST - /blah - 127.0.0.1!masked - 200 (9) -"), s)
+	assert.True(t, strings.Contains(s, "[INFO] REST POST - /blah?key=val&password=********&var=123 - 127.0.0.1!masked - 200 (9) -"), s)
 	assert.True(t, strings.HasSuffix(s, "- user - subj - 1234567890 abcdefg"))
 }
 
@@ -210,14 +210,14 @@ func TestSanitizeReqURL(t *testing.T) {
 		{"", ""},
 		{"xyz=123", "xyz=123"},
 		{"foo=bar&foo=buzz", "foo=bar&foo=buzz"},
-		{"foo=%2&password=1234", "password=........"},
-		{"xyz=123&seCret=asdfghjk", "seCret=........&xyz=123"},
-		{"xyz=123&secret=asdfghjk&key=val", "key=val&secret=........&xyz=123"},
-		{"xyz=123&secret=asdfghjk&key=val&password=1234", "key=val&password=........&secret=........&xyz=123"},
-		{"xyz=тест&passwoRD=1234", "passwoRD=........&xyz=тест"},
-		{"xyz=тест&password=1234&bar=buzz", "bar=buzz&password=........&xyz=тест"},
-		{"xyz=тест&password=пароль&bar=buzz", "bar=buzz&password=........&xyz=тест"},
-		{"xyz=тест&password=пароль&bar=buzz&q=?sss?ccc", "bar=buzz&password=........&q=?sss?ccc&xyz=тест"},
+		{"foo=%2&password=1234", "password=********"},
+		{"xyz=123&seCret=asdfghjk", "seCret=********&xyz=123"},
+		{"xyz=123&secret=asdfghjk&key=val", "key=val&secret=********&xyz=123"},
+		{"xyz=123&secret=asdfghjk&key=val&password=1234", "key=val&password=********&secret=********&xyz=123"},
+		{"xyz=тест&passwoRD=1234", "passwoRD=********&xyz=тест"},
+		{"xyz=тест&password=1234&bar=buzz", "bar=buzz&password=********&xyz=тест"},
+		{"xyz=тест&password=пароль&bar=buzz", "bar=buzz&password=********&xyz=тест"},
+		{"xyz=тест&password=пароль&bar=buzz&q=?sss?ccc", "bar=buzz&password=********&q=?sss?ccc&xyz=тест"},
 	}
 	unesc := func(s string) string {
 		s, _ = url.QueryUnescape(s)

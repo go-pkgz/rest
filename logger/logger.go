@@ -213,7 +213,7 @@ func (l *Middleware) sanitizeQuery(query string) string {
 		return query
 	}
 
-	return v.Encode()
+	return strings.Replace(v.Encode(), "........", "********", -1)
 }
 
 // customResponseWriter implements ResponseWriter and keeping status and size
