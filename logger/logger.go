@@ -185,9 +185,9 @@ var keysToHide = []string{"password", "passwd", "secret", "credentials", "token"
 
 // Hide query values for keysToHide. May change order of query params.
 // May escape unescaped query params.
-func (l *Middleware) sanitizeQuery(query string) string {
+func (l *Middleware) sanitizeQuery(rawQuery string) string {
 	// note that we skip non-nil error further
-	v, err := url.ParseQuery(query)
+	query, err := url.ParseQuery(rawQuery)
 
 	isHidden := func(key string) bool {
 		for _, k := range keysToHide {
@@ -199,21 +199,21 @@ func (l *Middleware) sanitizeQuery(query string) string {
 	}
 
 	present := false
-	for key, vs := range v {
+	for key, values := range query {
 		if isHidden(key) {
 			present = true
-			for i := range vs {
-				vs[i] = "........"
+			for i := range values {
+				values[i] = "********"
 			}
 		}
 	}
 
 	// short circuit
 	if (err == nil) && !present {
-		return query
+		return rawQuery
 	}
 
-	return strings.Replace(v.Encode(), "........", "********", -1)
+	return query.Encode()
 }
 
 // customResponseWriter implements ResponseWriter and keeping status and size
