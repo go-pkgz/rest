@@ -20,7 +20,7 @@ var reMultWhtsp = regexp.MustCompile(`[\s\p{Zs}]{2,}`)
 type Middleware struct {
 	prefix      string
 	maxBodySize int
-	flags       []Flag
+	flags       Flag
 	ipFn        func(ip string) string
 	userFn      func(r *http.Request) (string, error)
 	subjFn      func(r *http.Request) (string, error)
@@ -28,14 +28,16 @@ type Middleware struct {
 }
 
 // Flag type
-type Flag int
+type Flag uint32
 
-// logger flags enum
+// logger flags
 const (
-	All Flag = iota
-	User
+	User Flag = 1 << iota
 	Body
-	None
+
+	None Flag = 0
+
+	All = User | Body
 )
 
 // Backend is logging backend
@@ -61,7 +63,7 @@ func New(options ...Option) *Middleware {
 	res := Middleware{
 		prefix:      "",
 		maxBodySize: 1024,
-		flags:       []Flag{All},
+		flags:       All,
 		log:         stdBackend{},
 	}
 	for _, opt := range options {
@@ -75,7 +77,7 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 
 	fn := func(w http.ResponseWriter, r *http.Request) {
 
-		if l.inLogFlags(None) { // skip logging
+		if l.flags&All == 0 { // skip logging
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -146,7 +148,7 @@ func (l *Middleware) getBodyAndUser(r *http.Request) (body string, user string) 
 		return "", ""
 	}
 
-	if l.inLogFlags(Body) {
+	if l.flags&Body != 0 {
 		if content, err := ioutil.ReadAll(r.Body); err == nil {
 			body = string(content)
 			r.Body = ioutil.NopCloser(bytes.NewReader(content))
@@ -162,7 +164,7 @@ func (l *Middleware) getBodyAndUser(r *http.Request) (body string, user string) 
 		}
 	}
 
-	if l.inLogFlags(User) && l.userFn != nil {
+	if l.flags&User != 0 && l.userFn != nil {
 		u, err := l.userFn(r)
 		if err == nil && u != "" {
 			user = u
@@ -170,15 +172,6 @@ func (l *Middleware) getBodyAndUser(r *http.Request) (body string, user string) 
 	}
 
 	return body, user
-}
-
-func (l *Middleware) inLogFlags(f Flag) bool {
-	for _, flg := range l.flags {
-		if (flg == All && f != None) || flg == f {
-			return true
-		}
-	}
-	return false
 }
 
 var keysToHide = []string{"password", "passwd", "secret", "credentials", "token"}

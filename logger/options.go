@@ -7,10 +7,14 @@ import (
 // Option func type
 type Option func(l *Middleware)
 
-// Flags functional option defines output modes
+// Flags functional option defines output modes.
+// Makes a bitwise OR of the flags provided.
 func Flags(flags ...Flag) Option {
 	return func(l *Middleware) {
-		l.flags = flags
+		l.flags = None
+		for _, f := range flags {
+			l.flags |= f
+		}
 	}
 }
 
