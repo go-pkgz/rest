@@ -58,10 +58,10 @@ func TestLogger(t *testing.T) {
 		IPfn(func(ip string) string {
 			return ip + "!masked"
 		}),
-		UserFn(func(r *http.Request) (string, error) {
+		WithUser(func(r *http.Request) (string, error) {
 			return "user", nil
 		}),
-		SubjFn(func(r *http.Request) (string, error) {
+		WithSubj(func(r *http.Request) (string, error) {
 			return "subj", nil
 		}),
 	)
@@ -95,10 +95,10 @@ func TestLoggerTraceID(t *testing.T) {
 		IPfn(func(ip string) string {
 			return ip + "!masked"
 		}),
-		UserFn(func(r *http.Request) (string, error) {
+		WithUser(func(r *http.Request) (string, error) {
 			return "user", nil
 		}),
-		SubjFn(func(r *http.Request) (string, error) {
+		WithSubj(func(r *http.Request) (string, error) {
 			return "subj", nil
 		}),
 	)
@@ -196,14 +196,14 @@ func TestGetBodyAndUser(t *testing.T) {
 	assert.Equal(t, "body", body)
 	assert.Equal(t, "", user, "no user")
 
-	l = New(UserFn(func(r *http.Request) (string, error) {
+	l = New(WithUser(func(r *http.Request) (string, error) {
 		return "user1/id1", nil
 	}))
 	body, user = l.getBodyAndUser(req)
 	assert.Equal(t, "", body)
 	assert.Equal(t, `user1/id1`, user, "no user")
 
-	l = New(UserFn(func(r *http.Request) (string, error) {
+	l = New(WithUser(func(r *http.Request) (string, error) {
 		return "", errors.New("err")
 	}))
 	body, user = l.getBodyAndUser(req)

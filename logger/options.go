@@ -35,15 +35,15 @@ func IPfn(ipFn func(ip string) string) Option {
 	}
 }
 
-// UserFn triggers user name logging if userFn is not nil.
-func UserFn(userFn func(r *http.Request) (string, error)) Option {
+// WithUser triggers user name logging if userFn is not nil.
+func WithUser(userFn func(r *http.Request) (string, error)) Option {
 	return func(l *Middleware) {
 		l.userFn = userFn
 	}
 }
 
-// SubjFn triggers subject logging if subjFn is not nil.
-func SubjFn(userFn func(r *http.Request) (string, error)) Option {
+// WithSubj triggers subject logging if subjFn is not nil.
+func WithSubj(userFn func(r *http.Request) (string, error)) Option {
 	return func(l *Middleware) {
 		l.subjFn = userFn
 	}
