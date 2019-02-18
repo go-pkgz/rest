@@ -10,10 +10,40 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLoggerMinimal(t *testing.T) {
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+
+	lb := &mockLgr{}
+	l := New(Prefix("[INFO] REST"), Log(lb))
+
+	ts := httptest.NewServer(l.Handler(handler))
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL+"/blah", "", bytes.NewBufferString("1234567890 abcdefg"))
+	require.Nil(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, 200, resp.StatusCode)
+	b, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, "blah blah", string(b))
+
+	s := lb.buf.String()
+	t.Log(s)
+	prefix := "[INFO] REST POST - /blah - 127.0.0.1 - 200 (9) - "
+	assert.True(t, strings.HasPrefix(s, prefix), s)
+	_, err = time.ParseDuration(s[len(prefix):])
+	assert.NoError(t, err)
+}
 
 func TestLogger(t *testing.T) {
 
@@ -23,7 +53,7 @@ func TestLogger(t *testing.T) {
 	})
 
 	lb := &mockLgr{}
-	l := New(Prefix("[INFO] REST"), Flags(All),
+	l := New(Prefix("[INFO] REST"), WithBody,
 		Log(lb),
 		IPfn(func(ip string) string {
 			return ip + "!masked"
@@ -60,7 +90,7 @@ func TestLoggerTraceID(t *testing.T) {
 	})
 
 	lb := &mockLgr{}
-	l := New(Prefix("[INFO] REST"), Flags(All),
+	l := New(Prefix("[INFO] REST"), WithBody,
 		Log(lb),
 		IPfn(func(ip string) string {
 			return ip + "!masked"
@@ -107,7 +137,7 @@ func TestLoggerMaxBodySize(t *testing.T) {
 	})
 
 	lb := &mockLgr{}
-	l := New(Prefix("[INFO] REST"), Flags(All), Log(lb), MaxBodySize(10))
+	l := New(Prefix("[INFO] REST"), WithBody, Log(lb), MaxBodySize(10))
 
 	ts := httptest.NewServer(l.Handler(handler))
 	defer ts.Close()
@@ -144,28 +174,6 @@ func TestLoggerDefault(t *testing.T) {
 	assert.Equal(t, "blah blah", string(b))
 }
 
-func TestLoggerNone(t *testing.T) {
-	lb := &mockLgr{}
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte("blah blah"))
-		require.NoError(t, err)
-	})
-
-	l := New(Prefix("[INFO] REST"), Flags(None), Log(lb))
-	ts := httptest.NewServer(l.Handler(handler))
-	defer ts.Close()
-
-	resp, err := http.Get(ts.URL + "/blah")
-	require.Nil(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	assert.Equal(t, "blah blah", string(b))
-	assert.Equal(t, "", lb.buf.String())
-}
-
 type mockLgr struct {
 	buf bytes.Buffer
 }
@@ -177,26 +185,27 @@ func (m *mockLgr) Logf(format string, args ...interface{}) {
 func TestGetBodyAndUser(t *testing.T) {
 	req, err := http.NewRequest("GET", "http://example.com/request", strings.NewReader("body"))
 	require.Nil(t, err)
-	l := New()
 
+	l := New()
 	body, user := l.getBodyAndUser(req)
+	assert.Equal(t, "", body)
+	assert.Equal(t, "", user, "no user")
+
+	l = New(WithBody)
+	body, user = l.getBodyAndUser(req)
 	assert.Equal(t, "body", body)
 	assert.Equal(t, "", user, "no user")
 
-	l = New(Flags(User, Body), UserFn(func(r *http.Request) (string, error) {
+	l = New(UserFn(func(r *http.Request) (string, error) {
 		return "user1/id1", nil
 	}))
-	_, user = l.getBodyAndUser(req)
+	body, user = l.getBodyAndUser(req)
+	assert.Equal(t, "", body)
 	assert.Equal(t, `user1/id1`, user, "no user")
 
 	l = New(UserFn(func(r *http.Request) (string, error) {
 		return "", errors.New("err")
 	}))
-	body, user = l.getBodyAndUser(req)
-	assert.Equal(t, "body", body)
-	assert.Equal(t, "", user, "no user")
-
-	l = New(Flags(User))
 	body, user = l.getBodyAndUser(req)
 	assert.Equal(t, "", body)
 	assert.Equal(t, "", user, "no user")

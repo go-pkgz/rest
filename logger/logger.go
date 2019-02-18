@@ -19,26 +19,13 @@ var reMultWhtsp = regexp.MustCompile(`[\s\p{Zs}]{2,}`)
 // Middleware for logging rest requests
 type Middleware struct {
 	prefix      string
+	logBody     bool
 	maxBodySize int
-	flags       Flag
 	ipFn        func(ip string) string
 	userFn      func(r *http.Request) (string, error)
 	subjFn      func(r *http.Request) (string, error)
 	log         Backend
 }
-
-// Flag type
-type Flag uint32
-
-// logger flags
-const (
-	User Flag = 1 << iota
-	Body
-
-	None Flag = 0
-
-	All = User | Body
-)
 
 // Backend is logging backend
 type Backend interface {
@@ -63,7 +50,6 @@ func New(options ...Option) *Middleware {
 	res := Middleware{
 		prefix:      "",
 		maxBodySize: 1024,
-		flags:       All,
 		log:         stdBackend{},
 	}
 	for _, opt := range options {
@@ -76,11 +62,6 @@ func New(options ...Option) *Middleware {
 func (l *Middleware) Handler(next http.Handler) http.Handler {
 
 	fn := func(w http.ResponseWriter, r *http.Request) {
-
-		if l.flags&All == 0 { // skip logging
-			next.ServeHTTP(w, r)
-			return
-		}
 
 		ww := newCustomResponseWriter(w)
 		body, user := l.getBodyAndUser(r)
@@ -148,7 +129,7 @@ func (l *Middleware) getBodyAndUser(r *http.Request) (body string, user string) 
 		return "", ""
 	}
 
-	if l.flags&Body != 0 {
+	if l.logBody {
 		if content, err := ioutil.ReadAll(r.Body); err == nil {
 			body = string(content)
 			r.Body = ioutil.NopCloser(bytes.NewReader(content))
@@ -164,7 +145,7 @@ func (l *Middleware) getBodyAndUser(r *http.Request) (body string, user string) 
 		}
 	}
 
-	if l.flags&User != 0 && l.userFn != nil {
+	if l.userFn != nil {
 		u, err := l.userFn(r)
 		if err == nil && u != "" {
 			user = u
