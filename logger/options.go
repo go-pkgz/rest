@@ -43,9 +43,9 @@ func WithUser(userFn func(r *http.Request) (string, error)) Option {
 }
 
 // WithSubj triggers subject logging if subjFn is not nil.
-func WithSubj(userFn func(r *http.Request) (string, error)) Option {
+func WithSubj(subjFn func(r *http.Request) (string, error)) Option {
 	return func(l *Middleware) {
-		l.subjFn = userFn
+		l.subjFn = subjFn
 	}
 }
 
