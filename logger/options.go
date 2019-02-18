@@ -12,7 +12,7 @@ func WithBody(l *Middleware) {
 	l.logBody = true
 }
 
-// MaxBodySize functional option defines the largest body size to log.
+// MaxBodySize sets size of the logged part of the request body.
 func MaxBodySize(max int) Option {
 	return func(l *Middleware) {
 		if max >= 0 {
@@ -21,14 +21,14 @@ func MaxBodySize(max int) Option {
 	}
 }
 
-// Prefix functional option defines log line prefix.
+// Prefix sets log line prefix.
 func Prefix(prefix string) Option {
 	return func(l *Middleware) {
 		l.prefix = prefix
 	}
 }
 
-// IPfn functional option defines ip masking function.
+// IPfn sets IP masking function. If ipFn is nil then IP address will be logged as is.
 func IPfn(ipFn func(ip string) string) Option {
 	return func(l *Middleware) {
 		l.ipFn = ipFn
@@ -42,14 +42,14 @@ func UserFn(userFn func(r *http.Request) (string, error)) Option {
 	}
 }
 
-// SubjFn functional option defines subject function.
+// SubjFn triggers subject logging if subjFn is not nil.
 func SubjFn(userFn func(r *http.Request) (string, error)) Option {
 	return func(l *Middleware) {
 		l.subjFn = userFn
 	}
 }
 
-// Log functional option defines loging backend.
+// Log sets logging backend.
 func Log(log Backend) Option {
 	return func(l *Middleware) {
 		l.log = log
