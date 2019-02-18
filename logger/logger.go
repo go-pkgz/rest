@@ -16,7 +16,7 @@ import (
 
 var reMultWhtsp = regexp.MustCompile(`[\s\p{Zs}]{2,}`)
 
-// Middleware for logging rest requests
+// Middleware is a logger for rest requests.
 type Middleware struct {
 	prefix      string
 	logBody     bool
@@ -38,14 +38,14 @@ func (s stdBackend) Logf(format string, args ...interface{}) {
 	log.Printf(format, args...)
 }
 
-// Logger returns default logger middleware with REST prefix
+// Logger is default logger middleware with REST prefix
 func Logger(next http.Handler) http.Handler {
 	l := New(Prefix("REST"))
 	return l.Handler(next)
 
 }
 
-// New makes rest Logger with given options
+// New makes rest logger with given options
 func New(options ...Option) *Middleware {
 	res := Middleware{
 		prefix:      "",
@@ -190,7 +190,7 @@ func sanitizeQuery(rawQuery string) string {
 	return query.Encode()
 }
 
-// customResponseWriter implements ResponseWriter and keeping status and size
+// customResponseWriter implements http.ResponseWriter and keeping status and size
 type customResponseWriter struct {
 	http.ResponseWriter
 	status int
@@ -204,27 +204,27 @@ func newCustomResponseWriter(w http.ResponseWriter) *customResponseWriter {
 	}
 }
 
-// WriteHeader implements ResponseWriter and saves status
+// WriteHeader implements http.ResponseWriter and saves status
 func (c *customResponseWriter) WriteHeader(status int) {
 	c.status = status
 	c.ResponseWriter.WriteHeader(status)
 }
 
-// WriteHeader implements ResponseWriter and tracking size
+// Write implements http.ResponseWriter and tracking size
 func (c *customResponseWriter) Write(b []byte) (int, error) {
 	size, err := c.ResponseWriter.Write(b)
 	c.size += size
 	return size, err
 }
 
-// Flush implements ResponseWriter
+// Flush implements http.ResponseWriter
 func (c *customResponseWriter) Flush() {
 	if f, ok := c.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
 }
 
-// Hijack implements ResponseWriter
+// Hijack implements http.ResponseWriter
 func (c *customResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if hj, ok := c.ResponseWriter.(http.Hijacker); ok {
 		return hj.Hijack()
