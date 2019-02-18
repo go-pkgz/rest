@@ -7,15 +7,9 @@ import (
 // Option func type
 type Option func(l *Middleware)
 
-// Flags functional option defines output modes.
-// Makes a bitwise OR of the flags provided.
-func Flags(flags ...Flag) Option {
-	return func(l *Middleware) {
-		l.flags = None
-		for _, f := range flags {
-			l.flags |= f
-		}
-	}
+// WithBody triggers request body logging.
+func WithBody(l *Middleware) {
+	l.logBody = true
 }
 
 // MaxBodySize functional option defines the largest body size to log.
@@ -41,7 +35,7 @@ func IPfn(ipFn func(ip string) string) Option {
 	}
 }
 
-// UserFn functional option defines user name function.
+// UserFn triggers user name logging if userFn is not nil.
 func UserFn(userFn func(r *http.Request) (string, error)) Option {
 	return func(l *Middleware) {
 		l.userFn = userFn
