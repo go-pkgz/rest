@@ -70,7 +70,7 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 			t2 := time.Now()
 
 			u := *r.URL // shallow copy
-			u.RawQuery = l.sanitizeQuery(u.RawQuery)
+			u.RawQuery = sanitizeQuery(u.RawQuery)
 			rawurl := u.String()
 			if unescURL, err := url.QueryUnescape(rawurl); err == nil {
 				rawurl = unescURL
@@ -159,7 +159,7 @@ var keysToHide = []string{"password", "passwd", "secret", "credentials", "token"
 
 // Hide query values for keysToHide. May change order of query params.
 // May escape unescaped query params.
-func (l *Middleware) sanitizeQuery(rawQuery string) string {
+func sanitizeQuery(rawQuery string) string {
 	// note that we skip non-nil error further
 	query, err := url.ParseQuery(rawQuery)
 
