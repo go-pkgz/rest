@@ -38,7 +38,7 @@ func (s stdBackend) Logf(format string, args ...interface{}) {
 	log.Printf(format, args...)
 }
 
-// Logger is default logger middleware with REST prefix
+// Logger is a default logger middleware with "REST" prefix
 func Logger(next http.Handler) http.Handler {
 	l := New(Prefix("REST"))
 	return l.Handler(next)
@@ -190,7 +190,12 @@ func sanitizeQuery(rawQuery string) string {
 	return query.Encode()
 }
 
-// customResponseWriter implements http.ResponseWriter and keeping status and size
+// customResponseWriter is an HTTP response logger that keeps HTTP status code and
+// the number of bytes written.
+// It implements http.ResponseWriter, http.Flusher and http.Hijacker.
+// Note that type assertion from http.ResponseWriter(customResponseWriter) to
+// http.Flusher and http.Hijacker is always succeed but underlying http.ResponseWriter
+// may not implement them.
 type customResponseWriter struct {
 	http.ResponseWriter
 	status int
@@ -204,27 +209,23 @@ func newCustomResponseWriter(w http.ResponseWriter) *customResponseWriter {
 	}
 }
 
-// WriteHeader implements http.ResponseWriter and saves status
 func (c *customResponseWriter) WriteHeader(status int) {
 	c.status = status
 	c.ResponseWriter.WriteHeader(status)
 }
 
-// Write implements http.ResponseWriter and tracking size
 func (c *customResponseWriter) Write(b []byte) (int, error) {
 	size, err := c.ResponseWriter.Write(b)
 	c.size += size
 	return size, err
 }
 
-// Flush implements http.ResponseWriter
 func (c *customResponseWriter) Flush() {
 	if f, ok := c.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
 }
 
-// Hijack implements http.ResponseWriter
 func (c *customResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if hj, ok := c.ResponseWriter.(http.Hijacker); ok {
 		return hj.Hijack()
