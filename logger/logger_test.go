@@ -2,7 +2,6 @@ package logger
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -182,33 +181,17 @@ func (m *mockLgr) Logf(format string, args ...interface{}) {
 	m.buf.WriteString(fmt.Sprintf(format, args...))
 }
 
-func TestGetBodyAndUser(t *testing.T) {
+func TestGetBody(t *testing.T) {
 	req, err := http.NewRequest("GET", "http://example.com/request", strings.NewReader("body"))
 	require.Nil(t, err)
 
 	l := New()
-	body, user := l.getBodyAndUser(req)
+	body := l.getBody(req)
 	assert.Equal(t, "", body)
-	assert.Equal(t, "", user, "no user")
 
 	l = New(WithBody)
-	body, user = l.getBodyAndUser(req)
+	body = l.getBody(req)
 	assert.Equal(t, "body", body)
-	assert.Equal(t, "", user, "no user")
-
-	l = New(WithUser(func(r *http.Request) (string, error) {
-		return "user1/id1", nil
-	}))
-	body, user = l.getBodyAndUser(req)
-	assert.Equal(t, "", body)
-	assert.Equal(t, `user1/id1`, user, "no user")
-
-	l = New(WithUser(func(r *http.Request) (string, error) {
-		return "", errors.New("err")
-	}))
-	body, user = l.getBodyAndUser(req)
-	assert.Equal(t, "", body)
-	assert.Equal(t, "", user, "no user")
 }
 
 func TestSanitizeReqURL(t *testing.T) {

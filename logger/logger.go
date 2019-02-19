@@ -14,8 +14,6 @@ import (
 	"time"
 )
 
-var reMultWhtsp = regexp.MustCompile(`[\s\p{Zs}]{2,}`)
-
 // Middleware is a logger for rest requests.
 type Middleware struct {
 	prefix      string
@@ -62,9 +60,16 @@ func New(options ...Option) *Middleware {
 func (l *Middleware) Handler(next http.Handler) http.Handler {
 
 	fn := func(w http.ResponseWriter, r *http.Request) {
-
 		ww := newCustomResponseWriter(w)
-		body, user := l.getBodyAndUser(r)
+
+		user := ""
+		if l.userFn != nil {
+			if u, err := l.userFn(r); err == nil {
+				user = u
+			}
+		}
+
+		body := l.getBody(r)
 		t1 := time.Now()
 		defer func() {
 			t2 := time.Now()
@@ -123,36 +128,31 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
-func (l *Middleware) getBodyAndUser(r *http.Request) (body string, user string) {
-	ctx := r.Context()
-	if ctx == nil {
-		return "", ""
+var reMultWhtsp = regexp.MustCompile(`[\s\p{Zs}]{2,}`)
+
+func (l *Middleware) getBody(r *http.Request) string {
+	if !l.logBody {
+		return ""
 	}
 
-	if l.logBody {
-		if content, err := ioutil.ReadAll(r.Body); err == nil {
-			body = string(content)
-			r.Body = ioutil.NopCloser(bytes.NewReader(content))
-
-			if len(body) > 0 {
-				body = strings.Replace(body, "\n", " ", -1)
-				body = reMultWhtsp.ReplaceAllString(body, " ")
-			}
-
-			if len(body) > l.maxBodySize {
-				body = body[:l.maxBodySize] + "..."
-			}
-		}
+	content, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return ""
 	}
 
-	if l.userFn != nil {
-		u, err := l.userFn(r)
-		if err == nil && u != "" {
-			user = u
-		}
+	body := string(content)
+	r.Body = ioutil.NopCloser(bytes.NewReader(content))
+
+	if len(body) > 0 {
+		body = strings.Replace(body, "\n", " ", -1)
+		body = reMultWhtsp.ReplaceAllString(body, " ")
 	}
 
-	return body, user
+	if len(body) > l.maxBodySize {
+		body = body[:l.maxBodySize] + "..."
+	}
+
+	return body
 }
 
 var keysToHide = []string{"password", "passwd", "secret", "credentials", "token"}
