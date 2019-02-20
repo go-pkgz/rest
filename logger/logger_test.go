@@ -2,6 +2,7 @@ package logger
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -192,6 +193,48 @@ func TestGetBody(t *testing.T) {
 	l = New(WithBody)
 	body = l.getBody(req)
 	assert.Equal(t, "body", body)
+}
+
+func TestPeek(t *testing.T) {
+	cases := []struct {
+		body    string
+		n       int64
+		excerpt string
+		hasMore bool
+	}{
+		{"", -1, "", false},
+		{"", 0, "", false},
+		{"", 1024, "", false},
+		{"123456", -1, "", true},
+		{"123456", 0, "", true},
+		{"123456", 4, "1234", true},
+		{"123456", 5, "12345", true},
+		{"123456", 6, "123456", false},
+		{"123456", 7, "123456", false},
+	}
+
+	for _, c := range cases {
+		r, excerpt, hasMore, err := peek(strings.NewReader(c.body), c.n)
+		if !assert.NoError(t, err) {
+			continue
+		}
+		body, err := ioutil.ReadAll(r)
+		if !assert.NoError(t, err) {
+			continue
+		}
+		assert.Equal(t, c.body, string(body))
+		assert.Equal(t, c.excerpt, excerpt)
+		assert.Equal(t, c.hasMore, hasMore)
+	}
+
+	_, _, _, err := peek(errReader{}, 1024)
+	assert.Error(t, err)
+}
+
+type errReader struct{}
+
+func (errReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("test error")
 }
 
 func TestSanitizeReqURL(t *testing.T) {
