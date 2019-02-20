@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -135,24 +136,51 @@ func (l *Middleware) getBody(r *http.Request) string {
 		return ""
 	}
 
-	content, err := ioutil.ReadAll(r.Body)
+	reader, body, hasMore, err := peek(r.Body, int64(l.maxBodySize))
 	if err != nil {
 		return ""
 	}
 
-	body := string(content)
-	r.Body = ioutil.NopCloser(bytes.NewReader(content))
+	// "The Server will close the request body. The ServeHTTP Handler does not need to."
+	// https://golang.org/pkg/net/http/#Request
+	// So we can use ioutil.NopCloser() to make io.ReadCloser.
+	// Note that below assignment is not approved by the docs:
+	// "Except for reading the body, handlers should not modify the provided Request."
+	// https://golang.org/pkg/net/http/#Handler
+	r.Body = ioutil.NopCloser(reader)
 
 	if len(body) > 0 {
 		body = strings.Replace(body, "\n", " ", -1)
 		body = reMultWhtsp.ReplaceAllString(body, " ")
 	}
 
-	if len(body) > l.maxBodySize {
-		body = body[:l.maxBodySize] + "..."
+	if hasMore {
+		body += "..."
 	}
 
 	return body
+}
+
+// peek the first n bytes as string
+func peek(r io.Reader, n int64) (reader io.Reader, s string, hasMore bool, err error) {
+	if n < 0 {
+		n = 0
+	}
+
+	buf := new(bytes.Buffer)
+	_, err = io.CopyN(buf, r, n+1)
+	if err == io.EOF {
+		return buf, buf.String(), false, nil
+	}
+	if err != nil {
+		return r, "", false, err
+	}
+
+	// one extra byte is successfully read
+	s = buf.String()
+	s = s[:len(s)-1]
+
+	return io.MultiReader(buf, r), s, true, nil
 }
 
 var keysToHide = []string{"password", "passwd", "secret", "credentials", "token"}
