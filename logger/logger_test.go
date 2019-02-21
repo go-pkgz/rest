@@ -58,10 +58,10 @@ func TestLogger(t *testing.T) {
 		IPfn(func(ip string) string {
 			return ip + "!masked"
 		}),
-		WithUser(func(r *http.Request) (string, error) {
+		UserFn(func(r *http.Request) (string, error) {
 			return "user", nil
 		}),
-		WithSubj(func(r *http.Request) (string, error) {
+		SubjFn(func(r *http.Request) (string, error) {
 			return "subj", nil
 		}),
 	)
@@ -95,10 +95,10 @@ func TestLoggerTraceID(t *testing.T) {
 		IPfn(func(ip string) string {
 			return ip + "!masked"
 		}),
-		WithUser(func(r *http.Request) (string, error) {
+		UserFn(func(r *http.Request) (string, error) {
 			return "user", nil
 		}),
-		WithSubj(func(r *http.Request) (string, error) {
+		SubjFn(func(r *http.Request) (string, error) {
 			return "subj", nil
 		}),
 	)
