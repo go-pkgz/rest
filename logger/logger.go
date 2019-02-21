@@ -237,23 +237,27 @@ func newCustomResponseWriter(w http.ResponseWriter) *customResponseWriter {
 	}
 }
 
+// WriteHeader implements http.ResponseWriter and saves status
 func (c *customResponseWriter) WriteHeader(status int) {
 	c.status = status
 	c.ResponseWriter.WriteHeader(status)
 }
 
+// Write implements http.ResponseWriter and tracks number of bytes written
 func (c *customResponseWriter) Write(b []byte) (int, error) {
 	size, err := c.ResponseWriter.Write(b)
 	c.size += size
 	return size, err
 }
 
+// Flush implements http.Flusher
 func (c *customResponseWriter) Flush() {
 	if f, ok := c.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
 }
 
+// Hijack implements http.Hijacker
 func (c *customResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if hj, ok := c.ResponseWriter.(http.Hijacker); ok {
 		return hj.Hijack()
