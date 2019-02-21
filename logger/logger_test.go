@@ -258,9 +258,10 @@ func TestSanitizeReqURL(t *testing.T) {
 		s, _ = url.QueryUnescape(s)
 		return s
 	}
+	var l *Middleware
 	for i, tt := range tbl {
 		t.Run(tt.in, func(t *testing.T) {
-			assert.Equal(t, tt.out, unesc(sanitizeQuery(tt.in)), "check #%d, %s", i, tt.in)
+			assert.Equal(t, tt.out, unesc(l.sanitizeQuery(tt.in)), "check #%d, %s", i, tt.in)
 		})
 	}
 }
