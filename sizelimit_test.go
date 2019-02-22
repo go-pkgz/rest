@@ -44,6 +44,7 @@ func TestSizeLimit(t *testing.T) {
 		t.Run(fmt.Sprintf("test-%d", i), func(t *testing.T) {
 			client := http.Client{Timeout: 1 * time.Second}
 			req, err := http.NewRequest(tt.method, ts.URL+"/"+strconv.Itoa(i), strings.NewReader(tt.body))
+			require.NoError(t, err)
 			resp, err := client.Do(req)
 			require.NoError(t, err)
 			require.Equal(t, tt.code, resp.StatusCode)

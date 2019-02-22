@@ -32,7 +32,6 @@ func SizeLimit(size int64) func(http.Handler) http.Handler {
 			}
 			r.Body = ioutil.NopCloser(bytes.NewReader(content))
 			h.ServeHTTP(w, r)
-			return
 		}
 
 		return http.HandlerFunc(fn)
