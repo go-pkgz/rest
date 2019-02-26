@@ -7,7 +7,7 @@ import (
 // Option func type
 type Option func(l *Middleware)
 
-// WithBody triggers request body logging.
+// WithBody triggers request body logging. Body size is limited (default 1k)
 func WithBody(l *Middleware) {
 	l.logBody = true
 }
@@ -49,7 +49,7 @@ func SubjFn(subjFn func(r *http.Request) (string, error)) Option {
 	}
 }
 
-// Log sets logging backend.
+// Log sets logging backend. 
 func Log(log Backend) Option {
 	return func(l *Middleware) {
 		l.log = log

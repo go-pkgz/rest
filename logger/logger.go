@@ -82,11 +82,7 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 				rawurl = unescURL
 			}
 
-			remoteIP := strings.Split(r.RemoteAddr, ":")[0]
-			if strings.HasPrefix(r.RemoteAddr, "[") {
-				remoteIP = strings.Split(r.RemoteAddr, "]:")[0] + "]"
-			}
-
+			remoteIP := l.remoteIP(r)
 			if l.ipFn != nil { // mask ip with ipFn
 				remoteIP = l.ipFn(remoteIP)
 			}
@@ -216,6 +212,19 @@ func (l *Middleware) sanitizeQuery(rawQuery string) string {
 	}
 
 	return query.Encode()
+}
+
+// remoteIP gets address from X-Forwarded-For and than from request's remote address
+func (l *Middleware) remoteIP(r *http.Request) (remoteIP string) {
+
+	if remoteIP = r.Header.Get("X-Forwarded-For"); remoteIP == "" {
+		remoteIP = r.RemoteAddr
+	}
+	remoteIP = strings.Split(remoteIP, ":")[0]
+	if strings.HasPrefix(remoteIP, "[") {
+		remoteIP = strings.Split(remoteIP, "]:")[0] + "]"
+	}
+	return remoteIP
 }
 
 // customResponseWriter is an HTTP response logger that keeps HTTP status code and

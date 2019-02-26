@@ -83,6 +83,42 @@ func TestLogger(t *testing.T) {
 	assert.True(t, strings.HasSuffix(s, "- user - subj - 1234567890 abcdefg"))
 }
 
+func TestLoggerIP(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+		return
+	})
+
+	lb := &mockLgr{}
+	l := New(Log(lb), Prefix("[INFO] REST"), IPfn(func(ip string) string { return ip + "!masked" }))
+
+	ts := httptest.NewServer(l.Handler(handler))
+	defer ts.Close()
+
+	clint := http.Client{}
+
+	req, err := http.NewRequest("GET", ts.URL+"/blah", nil)
+	require.NoError(t, err)
+	resp, err := clint.Do(req)
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	s := lb.buf.String()
+	t.Log(s)
+	assert.True(t, strings.Contains(s, "- 127.0.0.1!masked -"))
+
+	lb.buf.Reset()
+	req, err = http.NewRequest("GET", ts.URL+"/blah", nil)
+	require.NoError(t, err)
+	req.Header.Set("X-Forwarded-For", "1.2.3.4")
+	resp, err = clint.Do(req)
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	s = lb.buf.String()
+	t.Log(s)
+	assert.True(t, strings.Contains(s, "- 1.2.3.4!masked -"))
+}
+
 func TestLoggerTraceID(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
