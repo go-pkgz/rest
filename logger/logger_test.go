@@ -132,7 +132,10 @@ func TestLoggerTraceID(t *testing.T) {
 func TestLoggerMaxBodySize(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte("blah blah"))
+		body, err := ioutil.ReadAll(r.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "1234567890 abcdefg", string(body))
+		_, err = w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
 
