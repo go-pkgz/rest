@@ -21,12 +21,12 @@ func SizeLimit(size int64) func(http.Handler) http.Handler {
 			}
 
 			// check size of the actual body
-			content, err := ioutil.ReadAll(io.LimitReader(r.Body, size))
+			content, err := ioutil.ReadAll(io.LimitReader(r.Body, size+1))
 			if err != nil {
 				w.WriteHeader(http.StatusServiceUnavailable)
 				return
 			}
-			if len(content) >= int(size) {
+			if int64(len(content)) > size {
 				w.WriteHeader(http.StatusRequestEntityTooLarge)
 				return
 			}
