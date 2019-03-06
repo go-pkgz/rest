@@ -38,9 +38,21 @@ pong
 
 ### Logger middleware
 
-Logs request, request handling timeout and response.\
-Logged request information. Always: HTTP method, URL being requested (with sanitized query), remote IP, request ID (if present). Optionally: userinfo, request subject and request body. Also remote IP can be optionally masked.\
-Logged response information: HTTP status code and response body size.
+Logs request, request handling time and response.
+
+- HTTP method
+- Requested URL (with sanitized query)
+- Remote IP
+- HTTP status code
+- Response body size
+- Request subject (optional)
+- Request subject (optional)
+- Request ID (if `X-Request-ID` present)
+- Request body (optional)
+
+_remote IP can be masked with user defined function_
+
+example: `019/03/05 17:26:12.976 [INFO] GET - /api/v1/find?site=remark - 8e228e9cfece - 200 (115) - 4.47784618s`
 
 ### Recoverer middleware
 
