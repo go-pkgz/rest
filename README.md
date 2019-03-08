@@ -38,14 +38,15 @@ pong
 
 ### Logger middleware
 
-Logs request, request handling time and response.
+Logs request, request handling time and response. Log record fields in order of occurrence:
 
-- HTTP method
+- Request's HTTP method
 - Requested URL (with sanitized query)
 - Remote IP
-- HTTP status code
+- Response's HTTP status code
 - Response body size
-- Request subject (optional)
+- Request handling time
+- Userinfo associated with the request (optional)
 - Request subject (optional)
 - Request ID (if `X-Request-ID` present)
 - Request body (optional)
