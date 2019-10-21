@@ -56,3 +56,28 @@ func TestErrorDetailsMsgNoError(t *testing.T) {
 	}
 	callerFn()
 }
+
+func TestErrorLogger_Log(t *testing.T) {
+	l := &mockLgr{}
+	errLogger := NewErrorLogger(l)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/error" {
+			t.Log("http err request", r.URL)
+			errLogger.Log(w, r, 500, errors.New("error 500"), "error details 123456")
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/error")
+	require.Nil(t, err)
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	require.Nil(t, err)
+	assert.Equal(t, 500, resp.StatusCode)
+
+	assert.Equal(t, `{"error":"error details 123456"}`+"\n", string(body))
+	t.Log(l.buf.String())
+}

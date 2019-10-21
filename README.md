@@ -90,6 +90,8 @@ It looks for `X-Request-ID` header and makes it as a random id
 - `rest.RenderJSONFromBytes` - renders json response from `[]byte`
 - `rest.RenderJSONWithHTML` -  renders json response with html tags and forced `charset=utf-8`
 - `rest.SendErrorJSON` - makes `{error: blah, details: blah}` json body and responds with given error code. Also adds context to logged message
+- `rest.NewErrorLogger(l logger.Backend)` creates a struct providing shorter form of logger call
+
 
 ## Caching
 
