@@ -21,7 +21,7 @@ In addition to `Get` and `Flush` methods, memory cache also support limits for a
 - Key may contain optional scopes (list of string). They not affect retrieval and used for partial (scoped) invalidation only.
 - Cache is safe for concurrent use.
 - Value is []byte.
-- `Get` method returns from the cache if the key already in. Overwise executes passed function and saves results.
+- `Get` method returns from the cache if the key already in. Otherwise executes passed function and saves results.
 - Special fake implementation `cache.Nop` satisfies `LoadingCache` interface and can be used to disable any caching
 
 ## Usage

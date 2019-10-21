@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// memoryCache implements LoadingCache interface on top of cache.Cache (go-cache)
+// memoryCache implements LoadingCache interface on top of hashicorp/golang-lru
 type memoryCache struct {
 	bytesCache   *lru.Cache
 	postFlushFn  func()
