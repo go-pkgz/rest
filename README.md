@@ -91,8 +91,3 @@ It looks for `X-Request-ID` header and makes it as a random id
 - `rest.RenderJSONWithHTML` -  renders json response with html tags and forced `charset=utf-8`
 - `rest.SendErrorJSON` - makes `{error: blah, details: blah}` json body and responds with given error code. Also adds context to logged message
 - `rest.NewErrorLogger(l logger.Backend)` creates a struct providing shorter form of logger call
-
-
-## Caching
-
-Cache wrapper provides loading cache for rest/http responses. See [cache readme](https://github.com/go-pkgz/rest/tree/master/cache) for more details and examples.
