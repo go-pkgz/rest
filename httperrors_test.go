@@ -41,7 +41,9 @@ func TestErrorDetailsMsg(t *testing.T) {
 		require.Nil(t, err)
 		req.RemoteAddr = "1.2.3.4"
 		msg := errDetailsMsg(req, 500, errors.New("error 500"), "error details 123456")
-		assert.Equal(t, "error details 123456 - error 500 - 500 - 1.2.3.4 - https://example.com/test?k1=v1&k2=v2 [caused by go-pkgz/rest/httperrors_test.go:46 rest.TestErrorDetailsMsg]", msg)
+		assert.Contains(t, msg, "error details 123456 - error 500 - 500 - 1.2.3.4 - https://example."+
+			"com/test?k1=v1&k2=v2 [caused by")
+		assert.Contains(t, msg, "rest/httperrors_test.go:48 rest.TestErrorDetailsMsg]")
 	}
 	callerFn()
 }
@@ -52,7 +54,8 @@ func TestErrorDetailsMsgNoError(t *testing.T) {
 		require.Nil(t, err)
 		req.RemoteAddr = "1.2.3.4"
 		msg := errDetailsMsg(req, 500, nil, "error details 123456")
-		assert.Equal(t, "error details 123456 - no error - 500 - 1.2.3.4 - https://example.com/test?k1=v1&k2=v2 [caused by go-pkgz/rest/httperrors_test.go:57 rest.TestErrorDetailsMsgNoError]", msg)
+		assert.Contains(t, msg, "error details 123456 - no error - 500 - 1.2.3.4 - https://example.com/test?k1=v1&k2=v2 [caused by")
+		assert.Contains(t, msg, "rest/httperrors_test.go:60 rest.TestErrorDetailsMsgNoError]")
 	}
 	callerFn()
 }
