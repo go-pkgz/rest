@@ -217,7 +217,7 @@ type mockLgr struct {
 }
 
 func (m *mockLgr) Logf(format string, args ...interface{}) {
-	m.buf.WriteString(fmt.Sprintf(format, args...))
+	_, _ = m.buf.WriteString(fmt.Sprintf(format, args...))
 }
 
 func TestGetBody(t *testing.T) {

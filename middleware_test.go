@@ -14,10 +14,11 @@ import (
 )
 
 func TestMiddleware_AppInfo(t *testing.T) {
-	os.Setenv("MHOST", "host1")
+	err := os.Setenv("MHOST", "host1")
+	assert.NoError(t, err)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte("blah blah"))
+		_, err = w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
 	ts := httptest.NewServer(AppInfo("app-name", "Umputun", "12345")(handler))
@@ -101,5 +102,5 @@ type mockLgr struct {
 }
 
 func (m *mockLgr) Logf(format string, args ...interface{}) {
-	m.buf.WriteString(fmt.Sprintf(format+"\n", args...))
+	_, _ = m.buf.WriteString(fmt.Sprintf(format+"\n", args...))
 }
