@@ -34,6 +34,7 @@ func TestBlackwords(t *testing.T) {
 	client := http.Client{Timeout: 5 * time.Second}
 
 	for n, tt := range tbl {
+		tt := tt
 		t.Run(fmt.Sprintf("test-%d", n), func(t *testing.T) {
 			req, err := http.NewRequest("GET", u, bytes.NewBuffer([]byte(tt.inp)))
 			assert.Nil(t, err)
@@ -70,6 +71,7 @@ func TestBlackwordsFn(t *testing.T) {
 	client := http.Client{Timeout: 5 * time.Second}
 
 	for n, tt := range tbl {
+		tt := tt
 		t.Run(fmt.Sprintf("test-%d", n), func(t *testing.T) {
 			req, err := http.NewRequest("GET", u, bytes.NewBuffer([]byte(tt.inp)))
 			assert.Nil(t, err)

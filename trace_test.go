@@ -39,7 +39,7 @@ func TestTraceWithID(t *testing.T) {
 			assert.Equal(t, "123456", traceID)
 			_, _ = rw.Write([]byte("blah"))
 		}
-		return http.HandlerFunc(fn)
+		return fn
 	}
 
 	ts := httptest.NewServer(Trace(handler()))

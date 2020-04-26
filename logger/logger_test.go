@@ -271,7 +271,7 @@ func TestPeek(t *testing.T) {
 
 type errReader struct{}
 
-func (errReader) Read(p []byte) (n int, err error) {
+func (errReader) Read(_ []byte) (n int, err error) {
 	return 0, errors.New("test error")
 }
 
@@ -298,6 +298,8 @@ func TestSanitizeReqURL(t *testing.T) {
 	}
 	var l *Middleware
 	for i, tt := range tbl {
+		i := i
+		tt := tt
 		t.Run(tt.in, func(t *testing.T) {
 			assert.Equal(t, tt.out, unesc(l.sanitizeQuery(tt.in)), "check #%d, %s", i, tt.in)
 		})
