@@ -42,7 +42,10 @@ func TestSizeLimit(t *testing.T) {
 	defer ts.Close()
 
 	for i, tt := range tbl {
+		i := i
+		tt := tt
 		for _, wrap := range []bool{false, true} {
+			wrap := wrap
 			t.Run(fmt.Sprintf("test-%d/%v", i, wrap), func(t *testing.T) {
 				client := http.Client{Timeout: 1 * time.Second}
 				var reader io.Reader = strings.NewReader(tt.body)

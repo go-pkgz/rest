@@ -96,7 +96,6 @@ func TestOnlyFromAllowedCIDR(t *testing.T) {
 }
 
 func TestOnlyFromRejected(t *testing.T) {
-
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
