@@ -39,8 +39,7 @@ func SendErrorJSON(w http.ResponseWriter, r *http.Request, l logger.Backend, cod
 	if l != nil {
 		l.Logf("%s", errDetailsMsg(r, code, err, msg))
 	}
-	w.WriteHeader(code)
-	RenderJSON(w, JSON{"error": msg})
+	RenderJSON(w, JSON{"error": msg}, code)
 }
 
 func errDetailsMsg(r *http.Request, code int, err error, msg string) string {
