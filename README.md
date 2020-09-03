@@ -82,6 +82,11 @@ SizeLimit middleware checks if body size is above the limit and returns `StatusR
 It looks for `X-Request-ID` header and makes it as a random id
  (if not found), then populates it to the result's header
     and to the request's context.
+
+### Deprecation 
+
+Adds rhe HTTP Deprecation response header, see [draft-dalal-deprecation-header-00](https://tools.ietf.org/id/draft-dalal-deprecation-header-00.html
+) 
     
 ## Helpers
 
