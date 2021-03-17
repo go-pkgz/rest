@@ -40,3 +40,19 @@ func TestRewriteCleanup(t *testing.T) {
 	require.NoError(t, err)
 	handler.ServeHTTP(rr, req)
 }
+
+func TestRewriteCleanupWithSlash(t *testing.T) {
+
+	rr := httptest.NewRecorder()
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("%+v", r)
+		assert.Equal(t, "/xyzzz/params/", r.URL.String())
+		assert.Equal(t, "/xyzzz/params/", r.URL.Path)
+		assert.Equal(t, "/api/v1/params/", r.Header.Get("X-Original-URL"))
+	})
+
+	handler := Rewrite("/api/v1/(.*)/", "/xyzzz/abc/../$1/")(testHandler)
+	req, err := http.NewRequest("GET", "/api/v1/params/", nil)
+	require.NoError(t, err)
+	handler.ServeHTTP(rr, req)
+}
