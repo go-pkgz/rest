@@ -9,6 +9,18 @@ import (
 	"github.com/go-pkgz/rest/logger"
 )
 
+// Wrap converts a list of middlewares to nested calls (in reverse order)
+func Wrap(handler http.Handler, mws ...func(http.Handler) http.Handler) http.Handler {
+	if len(mws) == 0 {
+		return handler
+	}
+	res := handler
+	for i := len(mws) - 1; i >= 0; i-- {
+		res = mws[i](res)
+	}
+	return res
+}
+
 // AppInfo adds custom app-info to the response header
 func AppInfo(app, author, version string) func(http.Handler) http.Handler {
 	f := func(h http.Handler) http.Handler {

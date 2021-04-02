@@ -89,12 +89,40 @@ func TestMiddleware_Recoverer(t *testing.T) {
 	assert.Contains(t, s, "github.com/go-pkgz/rest.TestMiddleware_Recoverer")
 
 	resp, err = http.Get(ts.URL + "/blah")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
+}
+
+func TestWrap(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("%s", r.URL.String())
+		assert.Equal(t, "/something/1/2", r.URL.Path)
+	})
+
+	mw1 := func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.URL.Path += "/1"
+			h.ServeHTTP(w, r)
+		})
+	}
+	mw2 := func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.URL.Path += "/2"
+			h.ServeHTTP(w, r)
+		})
+	}
+
+	h := Wrap(handler, mw1, mw2)
+	ts := httptest.NewServer(h)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/something")
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
 }
 
 type mockLgr struct {

@@ -99,10 +99,11 @@ Rewrites requests with from->to rule. Supports regex (like nginx) and prevents m
 
 ## Helpers
 
+- `rest.Wrap` - converts a list of middlewares to nested handlers calls (in reverse order)
 - `rest.JSON` - map alias, just for convenience `type JSON map[string]interface{}`
 - `rest.RenderJSON` -  renders json response from `interface{}`
 - `rest.RenderJSONFromBytes` - renders json response from `[]byte`
 - `rest.RenderJSONWithHTML` -  renders json response with html tags and forced `charset=utf-8`
 - `rest.SendErrorJSON` - makes `{error: blah, details: blah}` json body and responds with given error code. Also, adds context to the logged message
-- `rest.NewErrorLogger(l logger.Backend)` creates a struct providing shorter form of logger call
-- `rest.FileServer(public, local string)` creates a file server for static assets with directory listing disabled
+- `rest.NewErrorLogger` - creates a struct providing shorter form of logger call
+- `rest.FileServer` - creates a file server for static assets with directory listing disabled
