@@ -97,6 +97,18 @@ BasicAuth middleware requires basic auth and matches user & passwd with client-p
 
 Rewrites requests with from->to rule. Supports regex (like nginx) and prevents multiple rewrites. For example `Rewrite("^/sites/(.*)/settings/$", "/sites/settings/$1")` will change request's URL from `/sites/id1/settings/` to `/sites/settings/id1`
 
+## NoCache middleware
+
+Sets a number of HTTP headers to prevent a router (handler's) response from being cached by an upstream proxy and/or client.
+
+## Headers middleware
+
+Sets headers (passed as key:value) to requests. I.e. `rest.Headers("Server:MyServer", "X-Blah:Foo")`
+
+## Gzip middleware
+
+Compresses response with gzip.
+
 ## Helpers
 
 - `rest.Wrap` - converts a list of middlewares to nested handlers calls (in reverse order)
