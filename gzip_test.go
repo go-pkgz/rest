@@ -38,7 +38,7 @@ func TestGzip(t *testing.T) {
 		defer resp.Body.Close()
 		b, err := ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err)
-		assert.Equal(t, 355, len(b), "compressed size")
+		assert.Equal(t, 357, len(b), "compressed size")
 
 		gzr, err := gzip.NewReader(bytes.NewBuffer(b))
 		require.NoError(t, err)
