@@ -305,3 +305,37 @@ func TestSanitizeReqURL(t *testing.T) {
 		})
 	}
 }
+
+func TestLoggerApacheCombined(t *testing.T) {
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+
+	lb := &mockLgr{}
+	l := New(Log(lb), ApacheCombined,
+		IPfn(func(ip string) string {
+			return ip + "!masked"
+		}),
+		UserFn(func(r *http.Request) (string, error) {
+			return "user", nil
+		}),
+	)
+
+	ts := httptest.NewServer(l.Handler(handler))
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL+"/blah?password=secret&key=val&var=123", "", bytes.NewBufferString("1234567890 abcdefg"))
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, "blah blah", string(b))
+
+	s := lb.buf.String()
+	t.Log(s)
+	assert.True(t, strings.HasPrefix(s, "127.0.0.1!masked - user ["))
+	assert.True(t, strings.HasSuffix(s, ` "POST /blah?key=val&password=********&var=123" HTTP/1.1" 200 9 "" "Go-http-client/1.1"`), s)
+}
