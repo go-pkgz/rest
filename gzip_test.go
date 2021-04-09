@@ -32,7 +32,7 @@ func TestGzipCustom(t *testing.T) {
 		req, err := http.NewRequest("GET", ts.URL+"/something", nil)
 		require.NoError(t, err)
 		req.Header.Set("Accept-Encoding", "gzip")
-		req.Header.Set("Content-Type", "text/plain")
+		req.Header.Set("Content-Type", "text/plain; charset=utf-8")
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
