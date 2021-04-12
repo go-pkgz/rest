@@ -84,7 +84,8 @@ func TestMiddleware_Recoverer(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 500, resp.StatusCode)
 
-	assert.Contains(t, s, "request panic, oh my!")
+	assert.Contains(t, s, "request panic for /failed from")
+	assert.Contains(t, s, "oh my!")
 	assert.Contains(t, s, "goroutine")
 	assert.Contains(t, s, "github.com/go-pkgz/rest.TestMiddleware_Recoverer")
 
