@@ -39,7 +39,38 @@ func TestLoggerMinimal(t *testing.T) {
 
 	s := lb.buf.String()
 	t.Log(s)
-	prefix := "[INFO] REST POST - /blah - 127.0.0.1 - 200 (9) - "
+	prefix := "[INFO] REST POST - /blah - 127.0.0.1 - 127.0.0.1 - 200 (9) - "
+	assert.True(t, strings.HasPrefix(s, prefix), s)
+	_, err = time.ParseDuration(s[len(prefix):])
+	assert.NoError(t, err)
+
+}
+
+func TestLoggerMinimalLocalhost(t *testing.T) {
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+
+	lb := &mockLgr{}
+	l := New(Prefix("[INFO] REST"), Log(lb))
+
+	ts := httptest.NewServer(l.Handler(handler))
+	defer ts.Close()
+
+	port := strings.Split(ts.URL, ":")[2]
+	resp, err := http.Post("http://localhost:"+port+"/blah", "", bytes.NewBufferString("1234567890 abcdefg"))
+	require.Nil(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, 200, resp.StatusCode)
+	b, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, "blah blah", string(b))
+
+	s := lb.buf.String()
+	t.Log(s)
+	prefix := "[INFO] REST POST - /blah - localhost - 127.0.0.1 - 200 (9) - "
 	assert.True(t, strings.HasPrefix(s, prefix), s)
 	_, err = time.ParseDuration(s[len(prefix):])
 	assert.NoError(t, err)
@@ -79,7 +110,7 @@ func TestLogger(t *testing.T) {
 
 	s := lb.buf.String()
 	t.Log(s)
-	assert.True(t, strings.Contains(s, "[INFO] REST POST - /blah?key=val&password=********&var=123 - 127.0.0.1!masked - 200 (9) -"), s)
+	assert.True(t, strings.Contains(s, "[INFO] REST POST - /blah?key=val&password=********&var=123 - 127.0.0.1 - 127.0.0.1!masked - 200 (9) -"), s)
 	assert.True(t, strings.HasSuffix(s, "- user - subj - 1234567890 abcdefg"))
 }
 
@@ -190,7 +221,7 @@ func TestLoggerMaxBodySize(t *testing.T) {
 
 	s := lb.buf.String()
 	t.Log(s)
-	assert.True(t, strings.Contains(s, "[INFO] REST POST - /blah - 127.0.0.1 - 200 (9) -"), s)
+	assert.True(t, strings.Contains(s, "[INFO] REST POST - /blah - 127.0.0.1 - 127.0.0.1 - 200 (9) -"), s)
 	assert.True(t, strings.Contains(s, "1234567890..."), s)
 }
 
