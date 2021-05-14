@@ -55,8 +55,8 @@ func TestFileServer(t *testing.T) {
 			t.Logf("headers: %v", resp.Header)
 			assert.Equal(t, tt.status, resp.StatusCode)
 			if resp.StatusCode == http.StatusNotFound {
-				msg, err := ioutil.ReadAll(resp.Body)
-				require.NoError(t, err)
+				msg, e := ioutil.ReadAll(resp.Body)
+				require.NoError(t, e)
 				assert.Equal(t, "404 page not found\n", string(msg))
 				return
 			}
