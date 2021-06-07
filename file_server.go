@@ -25,16 +25,38 @@ func FileServer(public, local string, notFound io.Reader) (http.Handler, error) 
 		return nil, fmt.Errorf("local path %s doesn't exist: %w", root, err)
 	}
 
-	fs := http.StripPrefix(public, http.FileServer(noDirListingFS{http.Dir(root)}))
+	fs := http.StripPrefix(public, http.FileServer(noDirListingFS{http.Dir(root), false}))
 	return custom404Handler(fs, notFound)
 }
 
-type noDirListingFS struct{ fs http.FileSystem }
+// FileServerSPA returns FileServer as above, but instead of no-found returns /local/index.html
+func FileServerSPA(public, local string, notFound io.Reader) (http.Handler, error) {
+
+	root, err := filepath.Abs(local)
+	if err != nil {
+		return nil, fmt.Errorf("can't get absolute path for %s: %w", local, err)
+	}
+	if _, err = os.Stat(root); os.IsNotExist(err) {
+		return nil, fmt.Errorf("local path %s doesn't exist: %w", root, err)
+	}
+
+	fs := http.StripPrefix(public, http.FileServer(noDirListingFS{http.Dir(root), true}))
+	return custom404Handler(fs, notFound)
+}
+
+type noDirListingFS struct {
+	fs  http.FileSystem
+	spa bool
+}
 
 // Open file on FS, for directory enforce index.html and fail on a missing index
 func (fs noDirListingFS) Open(name string) (http.File, error) {
+
 	f, err := fs.fs.Open(name)
 	if err != nil {
+		if fs.spa {
+			return fs.fs.Open("/index.html")
+		}
 		return nil, err
 	}
 
