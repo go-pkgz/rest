@@ -31,6 +31,7 @@ func TestThrottle(t *testing.T) {
 			defer wg.Done()
 			resp, err := http.Get(ts.URL)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			switch resp.StatusCode {
 			case 200:
 				atomic.AddInt32(&okStatus, 1)
@@ -46,10 +47,10 @@ func TestThrottle(t *testing.T) {
 	// two more calls, should pass
 	resp, err := http.Get(ts.URL)
 	require.NoError(t, err)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	resp, err = http.Get(ts.URL)
 	require.NoError(t, err)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	assert.Equal(t, int32(12), atomic.LoadInt32(&calls))
 	assert.Equal(t, int32(10), atomic.LoadInt32(&okStatus))
