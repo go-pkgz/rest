@@ -16,7 +16,6 @@ import (
 //    // ..routes
 //    return r
 //  }
-
 func Profiler(onlyIps ...string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/pprof/", pprof.Index)
