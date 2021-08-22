@@ -15,8 +15,8 @@ import (
 	"github.com/go-pkgz/rest/logger"
 )
 
-func TestFileServer(t *testing.T) {
-	fh, err := FileServer("/static", "./testdata/root", nil)
+func TestFileServerDefault(t *testing.T) {
+	fh, err := NewFileServer("/static", "./testdata/root")
 	require.NoError(t, err)
 	ts := httptest.NewServer(logger.Logger(fh))
 	defer ts.Close()
@@ -68,8 +68,52 @@ func TestFileServer(t *testing.T) {
 	}
 }
 
+func TestFileServerWithListing(t *testing.T) {
+	fh, err := NewFileServer("/static", "./testdata/root", FsOptListing)
+	require.NoError(t, err)
+	ts := httptest.NewServer(logger.Logger(fh))
+	defer ts.Close()
+	client := http.Client{Timeout: 599 * time.Second}
+
+	{
+		req, err := http.NewRequest("GET", ts.URL+"/static/1", nil)
+		require.NoError(t, err)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		msg, err := ioutil.ReadAll(resp.Body)
+		require.NoError(t, err)
+		exp := `<pre>
+<a href="f1.html">f1.html</a>
+<a href="f2.html">f2.html</a>
+</pre>
+`
+		assert.Equal(t, exp, string(msg))
+	}
+
+	{
+		req, err := http.NewRequest("GET", ts.URL+"/static/xyz.js", nil)
+		require.NoError(t, err)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		msg, err := ioutil.ReadAll(resp.Body)
+		require.NoError(t, err)
+		assert.Equal(t, "testdata/xyz.js", string(msg))
+	}
+
+	{
+		req, err := http.NewRequest("GET", ts.URL+"/static/no-such-thing.html", nil)
+		require.NoError(t, err)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	}
+}
+
 func TestFileServer_Custom404(t *testing.T) {
-	fh, err := FileServer("/static", "./testdata/root", bytes.NewBufferString("custom 404"))
+	nf := FsOptCustom404(bytes.NewBufferString("custom 404"))
+	fh, err := NewFileServer("/static", "./testdata/root", nf)
 	require.NoError(t, err)
 	ts := httptest.NewServer(logger.Logger(fh))
 	defer ts.Close()
@@ -121,7 +165,7 @@ func TestFileServer_Custom404(t *testing.T) {
 }
 
 func TestFileServerSPA(t *testing.T) {
-	fh, err := FileServerSPA("/static", "./testdata/root", nil)
+	fh, err := NewFileServer("/static", "./testdata/root", FsOptSPA)
 	require.NoError(t, err)
 	ts := httptest.NewServer(logger.Logger(fh))
 	defer ts.Close()
