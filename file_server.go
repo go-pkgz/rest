@@ -131,17 +131,24 @@ func (cfs customFS) Open(name string) (http.File, error) {
 		return nil, err
 	}
 
-	s, err := f.Stat()
+	finfo, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
 
-	if s.IsDir() && !cfs.listing {
+	if finfo.IsDir() {
 		index := strings.TrimSuffix(name, "/") + "/index.html"
-		if _, err := cfs.fs.Open(index); err != nil {
-			return nil, err
+		if _, err := cfs.fs.Open(index); err == nil { // index.html will be served if found
+			return f, nil
+		}
+		// no index.html in directory
+		if !cfs.listing { // listing disabled
+			if _, err := cfs.fs.Open(index); err != nil {
+				return nil, err
+			}
 		}
 	}
+
 	return f, nil
 }
 
