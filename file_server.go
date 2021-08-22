@@ -55,19 +55,14 @@ func NewFileServer(public, local string, options ...FSOpt) (*FS, error) {
 		listing: res.enableListing,
 	}
 	f := http.StripPrefix(public, http.FileServer(cfs))
-
-	res.handler = func(w http.ResponseWriter, r *http.Request) {
-		f.ServeHTTP(w, r)
-	}
+	res.handler = func(w http.ResponseWriter, r *http.Request) { f.ServeHTTP(w, r) }
 
 	if !res.enableListing {
 		h, err := custom404Handler(f, res.notFound)
 		if err != nil {
 			return nil, err
 		}
-		res.handler = func(w http.ResponseWriter, r *http.Request) {
-			h.ServeHTTP(w, r)
-		}
+		res.handler = func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) }
 	}
 
 	return &res, nil
