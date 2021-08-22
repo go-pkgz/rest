@@ -10,12 +10,12 @@ import (
 	"strings"
 )
 
-// FileServer provides http.FileServer handler to serve static files from a http.FileSystem,
+// FS provides http.FileServer handler to serve static files from a http.FileSystem,
 // prevents directory listing by default and supports spa-friendly mode (off by default) returning /index.html on 404.
 // - public defines base path of the url, i.e. for http://example.com/static/* it should be /static
 // - local for the local path to the root of the served directory
 // - notFound is the reader for the custom 404 html, can be nil for default
-type FileServer struct {
+type FS struct {
 	public, root  string
 	notFound      io.Reader
 	isSpa         bool
@@ -24,8 +24,8 @@ type FileServer struct {
 }
 
 // NewFileServer creates file server with optional spa mode and optional direcroty listing (disabled by default)
-func NewFileServer(public, local string, options ...FSOpt) (*FileServer, error) {
-	res := FileServer{
+func NewFileServer(public, local string, options ...FSOpt) (*FS, error) {
+	res := FS{
 		public:        public,
 		notFound:      nil,
 		isSpa:         false,
@@ -73,29 +73,41 @@ func NewFileServer(public, local string, options ...FSOpt) (*FileServer, error) 
 	return &res, nil
 }
 
+// FileServer is a shortcut for making FS with listing disabled and the custom noFound reader (can be nil).
+// The method is for back-compatibility only and user should use the universal NewFileServer instead
+func FileServer(public, local string, notFound io.Reader) (http.Handler, error) {
+	return NewFileServer(public, local, FsOptCustom404(notFound))
+}
+
+// FileServerSPA is a shortcut for making FS with SPA-friendly handling of 404, listing disabled and the custom noFound reader (can be nil).
+// The method is for back-compatibility only and user should use the universal NewFileServer instead
+func FileServerSPA(public, local string, notFound io.Reader) (http.Handler, error) {
+	return NewFileServer(public, local, FsOptCustom404(notFound), FsOptSPA)
+}
+
 // ServeHTTP makes FileServer compatible with http.Handler interface
-func (fs *FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (fs *FS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fs.handler(w, r)
 }
 
 // FSOpt defines functional option type
-type FSOpt func(fs *FileServer) error
+type FSOpt func(fs *FS) error
 
 // FsOptSPA turns on SPA mode returning "/index.html" on not-found
-func FsOptSPA(fs *FileServer) error {
+func FsOptSPA(fs *FS) error {
 	fs.isSpa = true
 	return nil
 }
 
 // FsOptListing turns on directory listing
-func FsOptListing(fs *FileServer) error {
+func FsOptListing(fs *FS) error {
 	fs.enableListing = true
 	return nil
 }
 
 // FsOptCustom404 sets custom 404 reader
 func FsOptCustom404(fr io.Reader) FSOpt {
-	return func(fs *FileServer) error {
+	return func(fs *FS) error {
 		fs.notFound = fr
 		return nil
 	}
