@@ -24,7 +24,7 @@ type FS struct {
 }
 
 // NewFileServer creates file server with optional spa mode and optional direcroty listing (disabled by default)
-func NewFileServer(public, local string, options ...FSOpt) (*FS, error) {
+func NewFileServer(public, local string, options ...FsOpt) (*FS, error) {
 	res := FS{
 		public:        public,
 		notFound:      nil,
@@ -85,8 +85,8 @@ func (fs *FS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fs.handler(w, r)
 }
 
-// FSOpt defines functional option type
-type FSOpt func(fs *FS) error
+// FsOpt defines functional option type
+type FsOpt func(fs *FS) error
 
 // FsOptSPA turns on SPA mode returning "/index.html" on not-found
 func FsOptSPA(fs *FS) error {
@@ -101,7 +101,7 @@ func FsOptListing(fs *FS) error {
 }
 
 // FsOptCustom404 sets custom 404 reader
-func FsOptCustom404(fr io.Reader) FSOpt {
+func FsOptCustom404(fr io.Reader) FsOpt {
 	return func(fs *FS) error {
 		fs.notFound = fr
 		return nil
