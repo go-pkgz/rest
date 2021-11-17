@@ -17,7 +17,7 @@ func TestNoCache(t *testing.T) {
 	})
 
 	handler := NoCache(testHandler)
-	req, err := http.NewRequest("GET", "/api/v1/params", nil)
+	req, err := http.NewRequest("GET", "/api/v1/params", http.NoBody)
 	require.NoError(t, err)
 	req.Header.Set("ETag", "123")
 	req.Header.Set("If-None-Match", "xyz")

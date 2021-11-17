@@ -2,7 +2,7 @@ package rest
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -27,7 +27,7 @@ func TestSendErrorJSON(t *testing.T) {
 	require.Nil(t, err)
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	require.Nil(t, err)
 	assert.Equal(t, 500, resp.StatusCode)
 	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("content-type"))
@@ -37,7 +37,7 @@ func TestSendErrorJSON(t *testing.T) {
 
 func TestErrorDetailsMsg(t *testing.T) {
 	callerFn := func() {
-		req, err := http.NewRequest("GET", "https://example.com/test?k1=v1&k2=v2", nil)
+		req, err := http.NewRequest("GET", "https://example.com/test?k1=v1&k2=v2", http.NoBody)
 		require.Nil(t, err)
 		req.RemoteAddr = "1.2.3.4"
 		msg := errDetailsMsg(req, 500, errors.New("error 500"), "error details 123456")
@@ -51,7 +51,7 @@ func TestErrorDetailsMsg(t *testing.T) {
 
 func TestErrorDetailsMsgNoError(t *testing.T) {
 	callerFn := func() {
-		req, err := http.NewRequest("GET", "https://example.com/test?k1=v1&k2=v2", nil)
+		req, err := http.NewRequest("GET", "https://example.com/test?k1=v1&k2=v2", http.NoBody)
 		require.Nil(t, err)
 		req.RemoteAddr = "1.2.3.4"
 		msg := errDetailsMsg(req, 500, nil, "error details 123456")
@@ -78,7 +78,7 @@ func TestErrorLogger_Log(t *testing.T) {
 	require.Nil(t, err)
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	require.Nil(t, err)
 	assert.Equal(t, 500, resp.StatusCode)
 

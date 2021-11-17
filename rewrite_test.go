@@ -20,7 +20,7 @@ func TestRewrite(t *testing.T) {
 	})
 
 	handler := Rewrite("/api/v1/(.*)", "/xyzzz/$1?foo=bar")(testHandler)
-	req, err := http.NewRequest("GET", "/api/v1/params", nil)
+	req, err := http.NewRequest("GET", "/api/v1/params", http.NoBody)
 	require.NoError(t, err)
 	handler.ServeHTTP(rr, req)
 }
@@ -36,7 +36,7 @@ func TestRewriteCleanup(t *testing.T) {
 	})
 
 	handler := Rewrite("/api/v1/(.*)", "/xyzzz/abc/../$1?foo=bar")(testHandler)
-	req, err := http.NewRequest("GET", "/api/v1/params", nil)
+	req, err := http.NewRequest("GET", "/api/v1/params", http.NoBody)
 	require.NoError(t, err)
 	handler.ServeHTTP(rr, req)
 }
@@ -52,7 +52,7 @@ func TestRewriteCleanupWithSlash(t *testing.T) {
 	})
 
 	handler := Rewrite("/api/v1/(.*)/", "/xyzzz/abc/../$1/")(testHandler)
-	req, err := http.NewRequest("GET", "/api/v1/params/", nil)
+	req, err := http.NewRequest("GET", "/api/v1/params/", http.NoBody)
 	require.NoError(t, err)
 	handler.ServeHTTP(rr, req)
 }

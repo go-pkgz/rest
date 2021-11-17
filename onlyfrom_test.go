@@ -1,7 +1,7 @@
 package rest
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -24,7 +24,7 @@ func TestOnlyFromAllowed(t *testing.T) {
 	defer resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
 }
@@ -39,7 +39,7 @@ func TestOnlyFromAllowedHeaders(t *testing.T) {
 	defer ts.Close()
 
 	reqWithHeader := func(header string) (*http.Request, error) {
-		req, err := http.NewRequest("GET", ts.URL+"/blah", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/blah", http.NoBody)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +80,7 @@ func TestOnlyFromAllowedCIDR(t *testing.T) {
 	defer ts.Close()
 
 	client := http.Client{}
-	req, err := http.NewRequest("GET", ts.URL+"/blah", nil)
+	req, err := http.NewRequest("GET", ts.URL+"/blah", http.NoBody)
 	require.NoError(t, err)
 	req.Header.Set("X-Real-IP", "1.1.1.1")
 	resp, err := client.Do(req)

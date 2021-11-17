@@ -19,7 +19,7 @@ func TestDeprecated(t *testing.T) {
 	u := fmt.Sprintf("%s%s", ts.URL, "/something")
 
 	client := http.Client{Timeout: 5 * time.Second}
-	req, err := http.NewRequest("GET", u, nil)
+	req, err := http.NewRequest("GET", u, http.NoBody)
 	require.NoError(t, err)
 
 	r, err := client.Do(req)

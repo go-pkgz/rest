@@ -25,7 +25,7 @@ func TestBasicAuth(t *testing.T) {
 	client := http.Client{Timeout: 5 * time.Second}
 
 	{
-		req, err := http.NewRequest("GET", u, nil)
+		req, err := http.NewRequest("GET", u, http.NoBody)
 		require.NoError(t, err)
 		resp, err := client.Do(req)
 		require.NoError(t, err)
@@ -33,7 +33,7 @@ func TestBasicAuth(t *testing.T) {
 	}
 
 	{
-		req, err := http.NewRequest("GET", u, nil)
+		req, err := http.NewRequest("GET", u, http.NoBody)
 		require.NoError(t, err)
 		req.SetBasicAuth("dev", "good")
 		resp, err := client.Do(req)
@@ -42,7 +42,7 @@ func TestBasicAuth(t *testing.T) {
 	}
 
 	{
-		req, err := http.NewRequest("GET", u, nil)
+		req, err := http.NewRequest("GET", u, http.NoBody)
 		require.NoError(t, err)
 		req.SetBasicAuth("dev", "bad")
 		resp, err := client.Do(req)

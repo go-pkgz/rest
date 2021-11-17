@@ -2,7 +2,7 @@ package rest
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -56,19 +56,19 @@ func TestFileServerDefault(t *testing.T) {
 		tt := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			for _, ts := range []*httptest.Server{ts1, ts2} {
-				req, err := http.NewRequest("GET", ts.URL+tt.req, nil)
+				req, err := http.NewRequest("GET", ts.URL+tt.req, http.NoBody)
 				require.NoError(t, err)
 				resp, err := client.Do(req)
 				require.NoError(t, err)
 				t.Logf("headers: %v", resp.Header)
 				assert.Equal(t, tt.status, resp.StatusCode)
 				if resp.StatusCode == http.StatusNotFound {
-					msg, e := ioutil.ReadAll(resp.Body)
+					msg, e := io.ReadAll(resp.Body)
 					require.NoError(t, e)
 					assert.Equal(t, "404 page not found\n", string(msg))
 					return
 				}
-				body, err := ioutil.ReadAll(resp.Body)
+				body, err := io.ReadAll(resp.Body)
 				require.NoError(t, err)
 				assert.Equal(t, tt.body, string(body))
 			}
@@ -84,12 +84,12 @@ func TestFileServerWithListing(t *testing.T) {
 	client := http.Client{Timeout: 599 * time.Second}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/static/1", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/static/1", http.NoBody)
 		require.NoError(t, err)
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		msg, err := ioutil.ReadAll(resp.Body)
+		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		exp := `<pre>
 <a href="f1.html">f1.html</a>
@@ -100,18 +100,18 @@ func TestFileServerWithListing(t *testing.T) {
 	}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/static/xyz.js", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/static/xyz.js", http.NoBody)
 		require.NoError(t, err)
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		msg, err := ioutil.ReadAll(resp.Body)
+		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, "testdata/xyz.js", string(msg))
 	}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/static/no-such-thing.html", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/static/no-such-thing.html", http.NoBody)
 		require.NoError(t, err)
 		resp, err := client.Do(req)
 		require.NoError(t, err)
@@ -128,45 +128,45 @@ func TestFileServer_Custom404(t *testing.T) {
 	client := http.Client{Timeout: 599 * time.Second}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/static/xyz.js", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/static/xyz.js", http.NoBody)
 		require.NoError(t, err)
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		msg, err := ioutil.ReadAll(resp.Body)
+		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, "testdata/xyz.js", string(msg))
 	}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/static/nofile.js", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/static/nofile.js", http.NoBody)
 		require.NoError(t, err)
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-		msg, err := ioutil.ReadAll(resp.Body)
+		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, "custom 404", string(msg))
 	}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/xyz.html", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/xyz.html", http.NoBody)
 		require.NoError(t, err)
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-		msg, err := ioutil.ReadAll(resp.Body)
+		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, "custom 404", string(msg))
 	}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/static/xyz.js", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/static/xyz.js", http.NoBody)
 		require.NoError(t, err)
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		msg, err := ioutil.ReadAll(resp.Body)
+		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, "testdata/xyz.js", string(msg))
 	}
@@ -213,19 +213,19 @@ func TestFileServerSPA(t *testing.T) {
 		tt := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			for _, ts := range []*httptest.Server{ts1, ts2} {
-				req, err := http.NewRequest("GET", ts.URL+tt.req, nil)
+				req, err := http.NewRequest("GET", ts.URL+tt.req, http.NoBody)
 				require.NoError(t, err)
 				resp, err := client.Do(req)
 				require.NoError(t, err)
 				t.Logf("headers: %v", resp.Header)
 				assert.Equal(t, tt.status, resp.StatusCode)
 				if resp.StatusCode == http.StatusNotFound {
-					msg, e := ioutil.ReadAll(resp.Body)
+					msg, e := io.ReadAll(resp.Body)
 					require.NoError(t, e)
 					assert.Equal(t, "404 page not found\n", string(msg))
 					return
 				}
-				body, err := ioutil.ReadAll(resp.Body)
+				body, err := io.ReadAll(resp.Body)
 				require.NoError(t, err)
 				assert.Equal(t, tt.body, string(body))
 			}

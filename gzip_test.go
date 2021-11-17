@@ -3,7 +3,7 @@ package rest
 import (
 	"bytes"
 	"compress/gzip"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,7 +29,7 @@ func TestGzipCustom(t *testing.T) {
 	client := http.Client{}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/something", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/something", http.NoBody)
 		require.NoError(t, err)
 		req.Header.Set("Accept-Encoding", "gzip")
 		req.Header.Set("Content-Type", "text/plain; charset=utf-8")
@@ -37,19 +37,19 @@ func TestGzipCustom(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
 		defer resp.Body.Close()
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
 		assert.Equal(t, 357, len(b), "compressed size")
 
 		gzr, err := gzip.NewReader(bytes.NewBuffer(b))
 		require.NoError(t, err)
-		b, err = ioutil.ReadAll(gzr)
+		b, err = io.ReadAll(gzr)
 		require.NoError(t, err)
 		assert.True(t, strings.HasPrefix(string(b), "Lorem Ipsum"), string(b))
 	}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/something", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/something", http.NoBody)
 		require.NoError(t, err)
 		req.Header.Set("Accept-Encoding", "gzip")
 		req.Header.Set("Content-Type", "something")
@@ -57,7 +57,7 @@ func TestGzipCustom(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
 		defer resp.Body.Close()
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
 		assert.Equal(t, 576, len(b), "uncompressed size")
 	}
@@ -80,7 +80,7 @@ func TestGzipDefault(t *testing.T) {
 	client := http.Client{}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/something", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/something", http.NoBody)
 		require.NoError(t, err)
 		req.Header.Set("Accept-Encoding", "gzip")
 		req.Header.Set("Content-Type", "text/plain")
@@ -88,31 +88,31 @@ func TestGzipDefault(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
 		defer resp.Body.Close()
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
 		assert.Equal(t, 357, len(b), "compressed size")
 
 		gzr, err := gzip.NewReader(bytes.NewBuffer(b))
 		require.NoError(t, err)
-		b, err = ioutil.ReadAll(gzr)
+		b, err = io.ReadAll(gzr)
 		require.NoError(t, err)
 		assert.True(t, strings.HasPrefix(string(b), "Lorem Ipsum"), string(b))
 	}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/something", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/something", http.NoBody)
 		require.NoError(t, err)
 		resp, err := client.Do(req)
 		require.Nil(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
 		defer resp.Body.Close()
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
 		assert.Equal(t, 576, len(b), "uncompressed size")
 	}
 
 	{
-		req, err := http.NewRequest("GET", ts.URL+"/something", nil)
+		req, err := http.NewRequest("GET", ts.URL+"/something", http.NoBody)
 		require.NoError(t, err)
 		req.Header.Set("Accept-Encoding", "gzip")
 		req.Header.Set("Content-Type", "something")
@@ -120,7 +120,7 @@ func TestGzipDefault(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
 		defer resp.Body.Close()
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
 		assert.Equal(t, 576, len(b), "uncompressed size")
 	}

@@ -3,7 +3,6 @@ package rest
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -172,7 +171,7 @@ func custom404Handler(next http.Handler, notFound io.Reader) (http.Handler, erro
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { next.ServeHTTP(w, r) }), nil
 	}
 
-	body, err := ioutil.ReadAll(notFound)
+	body, err := io.ReadAll(notFound)
 	if err != nil {
 		return nil, err
 	}

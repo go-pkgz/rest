@@ -1,7 +1,7 @@
 package rest
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,7 +21,7 @@ func TestTraceNoID(t *testing.T) {
 		defer func() { _ = res.Body.Close() }()
 	}
 
-	b, err := ioutil.ReadAll(res.Body)
+	b, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, 200, res.StatusCode)
 	assert.Equal(t, "blah", string(b))
@@ -46,7 +46,7 @@ func TestTraceWithID(t *testing.T) {
 	defer ts.Close()
 
 	client := http.Client{Timeout: 5 * time.Second}
-	req, err := http.NewRequest("GET", ts.URL+"/something", nil)
+	req, err := http.NewRequest("GET", ts.URL+"/something", http.NoBody)
 	assert.NoError(t, err)
 	req.Header.Add("X-Request-Id", "123456")
 	res, err := client.Do(req)
@@ -55,7 +55,7 @@ func TestTraceWithID(t *testing.T) {
 		defer func() { _ = res.Body.Close() }()
 	}
 
-	b, err := ioutil.ReadAll(res.Body)
+	b, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, 200, res.StatusCode)
 	assert.Equal(t, "blah", string(b))

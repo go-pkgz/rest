@@ -3,7 +3,7 @@ package rest
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -30,7 +30,7 @@ func TestMiddleware_AppInfo(t *testing.T) {
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "blah blah", string(b))
@@ -53,7 +53,7 @@ func TestMiddleware_Ping(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "pong", string(b))
 
@@ -61,7 +61,7 @@ func TestMiddleware_Ping(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
-	b, err = ioutil.ReadAll(resp.Body)
+	b, err = io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
 }
@@ -94,7 +94,7 @@ func TestMiddleware_Recoverer(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
 }

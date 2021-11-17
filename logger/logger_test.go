@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -33,7 +33,7 @@ func TestLoggerMinimal(t *testing.T) {
 	require.Nil(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
 
@@ -64,7 +64,7 @@ func TestLoggerMinimalLocalhost(t *testing.T) {
 	require.Nil(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
 
@@ -104,7 +104,7 @@ func TestLogger(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
 
@@ -128,7 +128,7 @@ func TestLoggerIP(t *testing.T) {
 
 	clint := http.Client{}
 
-	req, err := http.NewRequest("GET", ts.URL+"/blah", nil)
+	req, err := http.NewRequest("GET", ts.URL+"/blah", http.NoBody)
 	require.NoError(t, err)
 	resp, err := clint.Do(req)
 	require.Nil(t, err)
@@ -138,7 +138,7 @@ func TestLoggerIP(t *testing.T) {
 	assert.True(t, strings.Contains(s, "- 127.0.0.1!masked -"))
 
 	lb.buf.Reset()
-	req, err = http.NewRequest("GET", ts.URL+"/blah", nil)
+	req, err = http.NewRequest("GET", ts.URL+"/blah", http.NoBody)
 	require.NoError(t, err)
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")
 	resp, err = clint.Do(req)
@@ -173,7 +173,7 @@ func TestLoggerTraceID(t *testing.T) {
 	defer ts.Close()
 
 	clint := http.Client{}
-	req, err := http.NewRequest("GET", ts.URL+"/blah", nil)
+	req, err := http.NewRequest("GET", ts.URL+"/blah", http.NoBody)
 	require.NoError(t, err)
 	req.Header.Set("X-Request-ID", "0000-reqid")
 	resp, err := clint.Do(req)
@@ -198,7 +198,7 @@ func TestLoggerTraceID(t *testing.T) {
 func TestLoggerMaxBodySize(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		assert.NoError(t, err)
 		assert.Equal(t, "1234567890 abcdefg", string(body))
 		_, err = w.Write([]byte("blah blah"))
@@ -215,7 +215,7 @@ func TestLoggerMaxBodySize(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
 
@@ -238,7 +238,7 @@ func TestLoggerDefault(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
 }
@@ -287,7 +287,7 @@ func TestPeek(t *testing.T) {
 		if !assert.NoError(t, err) {
 			continue
 		}
-		body, err := ioutil.ReadAll(r)
+		body, err := io.ReadAll(r)
 		if !assert.NoError(t, err) {
 			continue
 		}
@@ -361,7 +361,7 @@ func TestLoggerApacheCombined(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
 
