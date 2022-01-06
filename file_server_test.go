@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,7 +109,7 @@ func TestFileServerWithListing(t *testing.T) {
 		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, "testdata/xyz.js", string(msg))
-		assert.Equal(t, "text/javascript; charset=utf-8", resp.Header.Get("Content-Type"))
+		assert.True(t, strings.Contains(resp.Header.Get("Content-Type"), "javascript"), resp.Header.Get("Content-Type"))
 	}
 
 	{
@@ -138,7 +139,7 @@ func TestFileServer_Custom404(t *testing.T) {
 		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, "testdata/xyz.js", string(msg))
-		assert.Equal(t, "text/javascript; charset=utf-8", resp.Header.Get("Content-Type"))
+		assert.True(t, strings.Contains(resp.Header.Get("Content-Type"), "javascript"), resp.Header.Get("Content-Type"))
 	}
 
 	{
