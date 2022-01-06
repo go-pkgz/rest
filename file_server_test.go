@@ -147,6 +147,7 @@ func TestFileServer_Custom404(t *testing.T) {
 		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, "custom 404", string(msg))
+		assert.Equal(t, "text/html; charset=utf-8", resp.Header.Get("Content-Type"))
 	}
 
 	{
@@ -158,6 +159,7 @@ func TestFileServer_Custom404(t *testing.T) {
 		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, "custom 404", string(msg))
+		assert.Equal(t, "text/html; charset=utf-8", resp.Header.Get("Content-Type"))
 	}
 
 	{
