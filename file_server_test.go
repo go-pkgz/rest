@@ -108,6 +108,7 @@ func TestFileServerWithListing(t *testing.T) {
 		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, "testdata/xyz.js", string(msg))
+		assert.Equal(t, "text/javascript; charset=utf-8", resp.Header.Get("Content-Type"))
 	}
 
 	{
@@ -116,6 +117,7 @@ func TestFileServerWithListing(t *testing.T) {
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
 	}
 }
 
@@ -136,6 +138,7 @@ func TestFileServer_Custom404(t *testing.T) {
 		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, "testdata/xyz.js", string(msg))
+		assert.Equal(t, "text/javascript; charset=utf-8", resp.Header.Get("Content-Type"))
 	}
 
 	{
