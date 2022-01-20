@@ -52,6 +52,26 @@ func TestGetIPAddressFromHeaders(t *testing.T) {
 	{
 		req, err := http.NewRequest("GET", "/something", http.NoBody)
 		assert.NoError(t, err)
+		req.Header.Add("Something", "1234567")
+		req.Header.Add("X-Forwarded-For", "30.30.30.1")
+		req.Header.Add("X-Real-Ip", "8.8.8.8")
+		adr, err := GetIPAddress(req)
+		require.NoError(t, err)
+		assert.Equal(t, "30.30.30.1", adr)
+	}
+	{
+		req, err := http.NewRequest("GET", "/something", http.NoBody)
+		assert.NoError(t, err)
+		req.Header.Add("Something", "1234567")
+		req.Header.Add("X-Forwarded-For", "10.0.0.2,192.168.1.1")
+		req.Header.Add("X-Real-Ip", "8.8.8.8")
+		adr, err := GetIPAddress(req)
+		require.NoError(t, err)
+		assert.Equal(t, "8.8.8.8", adr)
+	}
+	{
+		req, err := http.NewRequest("GET", "/something", http.NoBody)
+		assert.NoError(t, err)
 		_, err = GetIPAddress(req)
 		require.Error(t, err)
 	}
