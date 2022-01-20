@@ -49,17 +49,15 @@ func GetIPAddress(r *http.Request) (string, error) {
 		// that will be the address right before our proxy.
 		for i := len(addresses) - 1; i >= 0; i-- {
 			ip := strings.TrimSpace(addresses[i])
-			// header can contain spaces too, strip those out.
 			realIP := net.ParseIP(ip)
 			if !realIP.IsGlobalUnicast() || isPrivateSubnet(realIP) {
-				// bad address, go to next
 				continue
 			}
 			return ip, nil
 		}
 	}
 
-	// X-Forwarded-For set but failed on previous checks
+	// X-Forwarded-For header set but parsing failed above
 	if r.Header.Get("X-Forwarded-For") != "" {
 		return "", fmt.Errorf("no valid ip found")
 	}
