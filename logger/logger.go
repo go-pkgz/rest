@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/go-pkgz/rest/utils"
 )
 
 // Middleware is a logger for rest requests.
@@ -103,7 +105,10 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 				rawurl = unescURL
 			}
 
-			remoteIP := l.remoteIP(r)
+			remoteIP, err := utils.GetIPAddress(r)
+			if err != nil {
+				remoteIP = "unknown ip"
+			}
 			if l.ipFn != nil { // mask ip with ipFn
 				remoteIP = l.ipFn(remoteIP)
 			}
@@ -169,7 +174,7 @@ func (l *Middleware) formatDefault(r *http.Request, p *logParts) string {
 }
 
 // 127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "http://www.example.com/start.html" "Mozilla/4.08 [en] (Win98; I ;Nav)"
-//nolint gosec
+// nolint gosec
 func (l *Middleware) formatApacheCombined(r *http.Request, p *logParts) string {
 	username := "-"
 	if p.user != "" {
