@@ -129,6 +129,7 @@ a request does not satisfy the maybeFn logic.
 - `rest.SendErrorJSON` - makes `{error: blah, details: blah}` json body and responds with given error code. Also, adds context to the logged message
 - `rest.NewErrorLogger` - creates a struct providing shorter form of logger call
 - `rest.FileServer` - creates a file server for static assets with directory listing disabled
+- `realip.Get` - returns client's IP address
 
 ## Profiler
 
