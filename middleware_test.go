@@ -9,7 +9,9 @@ import (
 	"os"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/go-pkgz/rest/realip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -171,6 +173,26 @@ func TestMaybe(t *testing.T) {
 		assert.Equal(t, "", req.Header.Get("h2"))
 		assert.Equal(t, 0, len(req.Header))
 	}
+}
+
+func TestRealIP(t *testing.T) {
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("%v", r)
+		require.Equal(t, "1.2.3.4", r.RemoteAddr)
+		adr, err := realip.Get(r)
+		require.NoError(t, err)
+		assert.Equal(t, "1.2.3.4", adr)
+	})
+
+	ts := httptest.NewServer(RealIP(handler))
+
+	req, err := http.NewRequest("GET", ts.URL+"/something", http.NoBody)
+	require.NoError(t, err)
+	client := http.Client{Timeout: time.Second}
+	req.Header.Add("X-Real-IP", "1.2.3.4")
+	_, err = client.Do(req)
+	require.NoError(t, err)
 }
 
 type mockLgr struct {
