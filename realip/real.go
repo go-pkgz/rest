@@ -1,4 +1,4 @@
-package utils
+package realip
 
 import (
 	"bytes"
@@ -22,8 +22,8 @@ var privateRanges = []ipRange{
 	{start: net.ParseIP("198.18.0.0"), end: net.ParseIP("198.19.255.255")},
 }
 
-// GetIPAddress returns real ip from the given request
-func GetIPAddress(r *http.Request) (string, error) {
+// Get returns real ip from the given request
+func Get(r *http.Request) (string, error) {
 
 	for _, h := range []string{"X-Forwarded-For", "X-Real-Ip"} {
 		addresses := strings.Split(r.Header.Get(h), ",")

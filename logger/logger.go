@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-pkgz/rest/utils"
+	"github.com/go-pkgz/rest/realip"
 )
 
 // Middleware is a logger for rest requests.
@@ -105,7 +105,7 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 				rawurl = unescURL
 			}
 
-			remoteIP, err := utils.GetIPAddress(r)
+			remoteIP, err := realip.Get(r)
 			if err != nil {
 				remoteIP = "unknown ip"
 			}
