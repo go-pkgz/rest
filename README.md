@@ -119,11 +119,6 @@ Maybe middleware will allow you to change the flow of the middleware stack execu
 value of maybeFn(request). This is useful for example if you'd like to skip a middleware handler if
 a request does not satisfy the maybeFn logic.
 
-## Headers middleware
-
-Headers middleware adds headers to request
-
-
 ## Helpers
 
 - `rest.Wrap` - converts a list of middlewares to nested handlers calls (in reverse order)
