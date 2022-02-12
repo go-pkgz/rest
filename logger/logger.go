@@ -296,19 +296,6 @@ func (l *Middleware) sanitizeQuery(rawQuery string) string {
 	return query.Encode()
 }
 
-// remoteIP gets address from X-Forwarded-For and than from request's remote address
-func (l *Middleware) remoteIP(r *http.Request) (remoteIP string) {
-
-	if remoteIP = r.Header.Get("X-Forwarded-For"); remoteIP == "" {
-		remoteIP = r.RemoteAddr
-	}
-	remoteIP = strings.Split(remoteIP, ":")[0]
-	if strings.HasPrefix(remoteIP, "[") {
-		remoteIP = strings.Split(remoteIP, "]:")[0] + "]"
-	}
-	return remoteIP
-}
-
 // customResponseWriter is an HTTP response logger that keeps HTTP status code and
 // the number of bytes written.
 // It implements http.ResponseWriter, http.Flusher and http.Hijacker.

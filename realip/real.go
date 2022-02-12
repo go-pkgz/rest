@@ -1,3 +1,4 @@
+// Package realip extracts a real IP address from the request.
 package realip
 
 import (
