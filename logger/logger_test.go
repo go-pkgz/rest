@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -147,6 +148,41 @@ func TestLoggerIP(t *testing.T) {
 	s = lb.buf.String()
 	t.Log(s)
 	assert.True(t, strings.Contains(s, "- 1.2.3.4!masked -"))
+}
+
+func TestLoggerIPAnon(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+
+	lb := &mockLgr{}
+	l := New(Log(lb), Prefix("[INFO] REST"), IPfn(AnonymizeIP))
+
+	ts := httptest.NewServer(l.Handler(handler))
+	defer ts.Close()
+
+	clint := http.Client{}
+
+	req, err := http.NewRequest("GET", ts.URL+"/blah", http.NoBody)
+	require.NoError(t, err)
+	resp, err := clint.Do(req)
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	s := lb.buf.String()
+	t.Log(s)
+	assert.True(t, strings.Contains(s, "- 127.0.0.0 -"), s)
+
+	lb.buf.Reset()
+	req, err = http.NewRequest("GET", ts.URL+"/blah", http.NoBody)
+	require.NoError(t, err)
+	req.Header.Set("X-Forwarded-For", "1.2.3.4")
+	resp, err = clint.Do(req)
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	s = lb.buf.String()
+	t.Log(s)
+	assert.True(t, strings.Contains(s, "- 1.2.3.0 -"), s)
 }
 
 func TestLoggerTraceID(t *testing.T) {
@@ -369,4 +405,21 @@ func TestLoggerApacheCombined(t *testing.T) {
 	t.Log(s)
 	assert.True(t, strings.HasPrefix(s, "127.0.0.1!masked - user ["))
 	assert.True(t, strings.HasSuffix(s, ` "POST /blah?key=val&password=********&var=123" HTTP/1.1" 200 9 "" "Go-http-client/1.1"`), s)
+}
+
+func TestAnonymizeIP(t *testing.T) {
+	tbl := []struct {
+		inp, out string
+	}{
+		{"12.34.56.78", "12.34.56.0"},
+		{"", ""},
+		{"", ""},
+		{"12.34.56", "12.34.56"},
+	}
+
+	for i, tt := range tbl {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			assert.Equal(t, tt.out, AnonymizeIP(tt.inp))
+		})
+	}
 }
