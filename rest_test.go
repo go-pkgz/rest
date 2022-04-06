@@ -5,8 +5,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
+	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,6 +74,53 @@ func TestRest_RenderJSONWithHTML(t *testing.T) {
 
 	assert.Equal(t, j1, j2)
 	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+}
+
+func TestParseFromTo(t *testing.T) {
+
+	tbl := []struct {
+		query    string
+		from, to time.Time
+		err      error
+	}{
+		{
+			query: "from=20220406&to=20220501",
+			from:  time.Date(2022, time.April, 6, 0, 0, 0, 0, time.UTC),
+			to:    time.Date(2022, time.May, 1, 0, 0, 0, 0, time.UTC),
+			err:   nil,
+		},
+		{
+			query: "from=2022-04-06T18:30:25&to=2022-05-01T17:50",
+			from:  time.Date(2022, time.April, 6, 18, 30, 25, 0, time.UTC),
+			to:    time.Date(2022, time.May, 1, 17, 50, 0, 0, time.UTC),
+			err:   nil,
+		},
+		{
+			query: "from=2022-04-06T18:30:25&to=xyzbad",
+			err:   errors.New(`incorrect to time: can't parse date "xyzbad"`),
+		},
+		{
+			query: "from=123455&to=2022-05-01T17:50",
+			err:   errors.New(`incorrect from time: can't parse date "123455"`),
+		},
+		{"", time.Time{}, time.Time{}, errors.New("incorrect from time: can't parse date \"\"")},
+	}
+
+	for i, tt := range tbl {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			req, err := http.NewRequest("GET", "http://localhost?"+tt.query, http.NoBody)
+			require.NoError(t, err)
+			from, to, err := ParseFromTo(req)
+			if tt.err != nil {
+				assert.EqualError(t, err, tt.err.Error())
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.from, from)
+			assert.Equal(t, tt.to, to)
+		})
+	}
+
 }
 
 func getTestHandlerBlah() http.HandlerFunc {

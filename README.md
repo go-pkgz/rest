@@ -130,6 +130,7 @@ a request does not satisfy the maybeFn logic.
 - `rest.NewErrorLogger` - creates a struct providing shorter form of logger call
 - `rest.FileServer` - creates a file server for static assets with directory listing disabled
 - `realip.Get` - returns client's IP address
+- `rest.ParseFromTo` - parses "from" and "to" request's query params with various formats
 
 ## Profiler
 
