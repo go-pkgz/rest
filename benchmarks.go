@@ -55,8 +55,7 @@ func (b *Benchmarks) Handler(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		st := b.nowFn()
 		defer func() {
-			reqDuration := time.Since(st)
-			b.update(reqDuration)
+			b.update(time.Since(st))
 		}()
 		next.ServeHTTP(w, r)
 	}
