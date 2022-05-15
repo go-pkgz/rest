@@ -99,6 +99,10 @@ func (b *Benchmarks) update(reqDuration time.Duration) {
 
 // Stats returns the current benchmark stats for the given duration
 func (b *Benchmarks) Stats(interval time.Duration) BenchmarkStats {
+	if interval < time.Second { // minimum interval is 1s due to the bucket size
+		return BenchmarkStats{}
+	}
+
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 

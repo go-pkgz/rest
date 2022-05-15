@@ -30,6 +30,12 @@ func TestBenchmark_Stats(t *testing.T) {
 		assert.Equal(t, BenchmarkStats{Requests: 4, RequestsSec: 4, AverageRespTime: 0.1375,
 			MinRespTime: (time.Millisecond * 50).Seconds(), MaxRespTime: (time.Millisecond * 250).Seconds()}, res)
 	}
+
+	{
+		res := bench.Stats(time.Millisecond * 999)
+		t.Logf("%+v", res)
+		assert.Equal(t, BenchmarkStats{}, res)
+	}
 }
 
 func TestBenchmark_Stats2s(t *testing.T) {
