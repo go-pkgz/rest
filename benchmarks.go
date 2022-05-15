@@ -10,7 +10,7 @@ import (
 var maxTimeRange = time.Duration(15) * time.Minute
 
 // Benchmarks is a basic benchmarking middleware collecting and reporting performance metrics
-// It keeps track of the of requests speed and count in 1s benchData buckets limiting the number of buckets
+// It keeps track of the requests speeds and counts in 1s benchData buckets ,limiting the number of buckets
 // to maxTimeRange. User can request the benchmark for any time duration. This is intended to be used
 // for retrieving the benchmark data for the last minute, 5 minutes and up to maxTimeRange.
 type Benchmarks struct {
