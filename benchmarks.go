@@ -42,11 +42,9 @@ type BenchmarkStats struct {
 // NewBenchmarks creates a new benchmark middleware
 func NewBenchmarks() *Benchmarks {
 	res := &Benchmarks{
-		st:   time.Now(),
-		data: list.New(),
-		nowFn: func() time.Time {
-			return time.Now()
-		},
+		st:    time.Now(),
+		data:  list.New(),
+		nowFn: time.Now,
 	}
 	return res
 }
