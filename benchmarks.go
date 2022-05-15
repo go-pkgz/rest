@@ -17,6 +17,8 @@ type Benchmarks struct {
 	st   time.Time
 	data *list.List
 	lock sync.RWMutex
+
+	nowFn func() time.Time // for testing only
 }
 
 type benchData struct {
@@ -42,6 +44,9 @@ func NewBenchmarks() *Benchmarks {
 	res := &Benchmarks{
 		st:   time.Now(),
 		data: list.New(),
+		nowFn: func() time.Time {
+			return time.Now()
+		},
 	}
 	return res
 }
@@ -50,7 +55,7 @@ func NewBenchmarks() *Benchmarks {
 func (b *Benchmarks) Handler(next http.Handler) http.Handler {
 
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		st := time.Now()
+		st := b.nowFn()
 		defer func() {
 			reqDuration := time.Since(st)
 			b.update(reqDuration)
@@ -61,14 +66,14 @@ func (b *Benchmarks) Handler(next http.Handler) http.Handler {
 }
 
 func (b *Benchmarks) update(reqDuration time.Duration) {
-	now := time.Now().Truncate(time.Second)
+	now := b.nowFn().Truncate(time.Second)
 
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
 	// keep maxTimeRange in the list, drop the rest
 	for e := b.data.Front(); e != nil; e = e.Next() {
-		if b.data.Front().Value.(benchData).ts.After(time.Now().Add(-maxTimeRange)) {
+		if b.data.Front().Value.(benchData).ts.After(b.nowFn().Add(-maxTimeRange)) {
 			break
 		}
 		b.data.Remove(b.data.Front())
@@ -109,7 +114,7 @@ func (b *Benchmarks) Stats(interval time.Duration) BenchmarkStats {
 	var minRespTime, maxRespTime time.Duration
 	for e := b.data.Back(); e != nil; e = e.Prev() { // reverse order
 		bd := e.Value.(benchData)
-		if bd.ts.Before(time.Now().Add(-interval)) {
+		if bd.ts.Before(b.nowFn().Add(-interval)) {
 			break
 		}
 		if minRespTime == 0 || bd.minRespTime < minRespTime {
