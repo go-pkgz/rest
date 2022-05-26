@@ -32,11 +32,11 @@ type benchData struct {
 
 // BenchmarkStats holds the stats for a given interval
 type BenchmarkStats struct {
-	Requests        int     `json:"requests"`
-	RequestsSec     float64 `json:"requests_sec"`
-	AverageRespTime float64 `json:"average_resp_time"`
-	MinRespTime     float64 `json:"min_resp_time"`
-	MaxRespTime     float64 `json:"max_resp_time"`
+	Requests        int     `json:"total_requests"`
+	RequestsSec     float64 `json:"total_requests_sec"`
+	AverageRespTime int64   `json:"average_resp_time"`
+	MinRespTime     int64   `json:"min_resp_time"`
+	MaxRespTime     int64   `json:"max_resp_time"`
 }
 
 // NewBenchmarks creates a new benchmark middleware
@@ -139,8 +139,8 @@ func (b *Benchmarks) Stats(interval time.Duration) BenchmarkStats {
 	return BenchmarkStats{
 		Requests:        requests,
 		RequestsSec:     float64(requests) / (fnInterval.Sub(stInterval).Seconds()),
-		AverageRespTime: respTime.Seconds() / float64(requests),
-		MinRespTime:     minRespTime.Seconds(),
-		MaxRespTime:     maxRespTime.Seconds(),
+		AverageRespTime: respTime.Milliseconds() / int64(requests),
+		MinRespTime:     minRespTime.Milliseconds(),
+		MaxRespTime:     maxRespTime.Milliseconds(),
 	}
 }
