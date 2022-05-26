@@ -139,8 +139,8 @@ func (b *Benchmarks) Stats(interval time.Duration) BenchmarkStats {
 	return BenchmarkStats{
 		Requests:        requests,
 		RequestsSec:     float64(requests) / (fnInterval.Sub(stInterval).Seconds()),
-		AverageRespTime: respTime.Milliseconds() / int64(requests),
-		MinRespTime:     minRespTime.Milliseconds(),
-		MaxRespTime:     maxRespTime.Milliseconds(),
+		AverageRespTime: respTime.Microseconds() / int64(requests),
+		MinRespTime:     minRespTime.Microseconds(),
+		MaxRespTime:     maxRespTime.Microseconds(),
 	}
 }

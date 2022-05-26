@@ -20,15 +20,15 @@ func TestBenchmark_Stats(t *testing.T) {
 	{
 		res := bench.Stats(time.Minute)
 		t.Logf("%+v", res)
-		assert.Equal(t, BenchmarkStats{Requests: 4, RequestsSec: 4, AverageRespTime: 137,
-			MinRespTime: (time.Millisecond * 50).Milliseconds(), MaxRespTime: (time.Millisecond * 250).Milliseconds()}, res)
+		assert.Equal(t, BenchmarkStats{Requests: 4, RequestsSec: 4, AverageRespTime: 137500,
+			MinRespTime: (time.Millisecond * 50).Microseconds(), MaxRespTime: (time.Millisecond * 250).Microseconds()}, res)
 	}
 
 	{
 		res := bench.Stats(time.Second * 5)
 		t.Logf("%+v", res)
-		assert.Equal(t, BenchmarkStats{Requests: 4, RequestsSec: 4, AverageRespTime: 137,
-			MinRespTime: (time.Millisecond * 50).Milliseconds(), MaxRespTime: (time.Millisecond * 250).Milliseconds()}, res)
+		assert.Equal(t, BenchmarkStats{Requests: 4, RequestsSec: 4, AverageRespTime: 137500,
+			MinRespTime: (time.Millisecond * 50).Microseconds(), MaxRespTime: (time.Millisecond * 250).Microseconds()}, res)
 	}
 
 	{
@@ -48,8 +48,8 @@ func TestBenchmark_Stats2s(t *testing.T) {
 
 	res := bench.Stats(time.Minute)
 	t.Logf("%+v", res)
-	assert.Equal(t, BenchmarkStats{Requests: 4, RequestsSec: 2, AverageRespTime: 137,
-		MinRespTime: (time.Millisecond * 50).Milliseconds(), MaxRespTime: (time.Millisecond * 250).Milliseconds()}, res)
+	assert.Equal(t, BenchmarkStats{Requests: 4, RequestsSec: 2, AverageRespTime: 137500,
+		MinRespTime: (time.Millisecond * 50).Microseconds(), MaxRespTime: (time.Millisecond * 250).Microseconds()}, res)
 }
 
 func TestBenchmark_Cleanup(t *testing.T) {
@@ -64,14 +64,14 @@ func TestBenchmark_Cleanup(t *testing.T) {
 	{
 		res := bench.Stats(time.Hour)
 		t.Logf("%+v", res)
-		assert.Equal(t, BenchmarkStats{Requests: 900, RequestsSec: 1, AverageRespTime: 50,
-			MinRespTime: (time.Millisecond * 50).Milliseconds(), MaxRespTime: (time.Millisecond * 50).Milliseconds()}, res)
+		assert.Equal(t, BenchmarkStats{Requests: 900, RequestsSec: 1, AverageRespTime: 50000,
+			MinRespTime: (time.Millisecond * 50).Microseconds(), MaxRespTime: (time.Millisecond * 50).Microseconds()}, res)
 	}
 	{
 		res := bench.Stats(time.Minute)
 		t.Logf("%+v", res)
-		assert.Equal(t, BenchmarkStats{Requests: 60, RequestsSec: 1, AverageRespTime: 50,
-			MinRespTime: (time.Millisecond * 50).Milliseconds(), MaxRespTime: (time.Millisecond * 50).Milliseconds()}, res)
+		assert.Equal(t, BenchmarkStats{Requests: 60, RequestsSec: 1, AverageRespTime: 50000,
+			MinRespTime: (time.Millisecond * 50).Microseconds(), MaxRespTime: (time.Millisecond * 50).Microseconds()}, res)
 	}
 
 	assert.Equal(t, 900, bench.data.Len())
@@ -99,9 +99,9 @@ func TestBenchmarks_Handler(t *testing.T) {
 		t.Logf("%+v", res)
 		assert.Equal(t, 100, res.Requests)
 		assert.True(t, res.RequestsSec <= 20 && res.RequestsSec >= 10)
-		assert.InDelta(t, 50, res.AverageRespTime, 10)
-		assert.InDelta(t, 50, res.MinRespTime, 10)
-		assert.InDelta(t, 50, res.MaxRespTime, 10)
+		assert.InDelta(t, 50000, res.AverageRespTime, 10000)
+		assert.InDelta(t, 50000, res.MinRespTime, 10000)
+		assert.InDelta(t, 50000, res.MaxRespTime, 10000)
 		assert.True(t, res.MaxRespTime >= res.MinRespTime)
 	}
 
@@ -109,10 +109,10 @@ func TestBenchmarks_Handler(t *testing.T) {
 		res := bench.Stats(time.Minute * 15)
 		t.Logf("%+v", res)
 		assert.Equal(t, 100, res.Requests)
-		assert.True(t, res.RequestsSec <= 20 && res.RequestsSec >= 10)
-		assert.InDelta(t, 50, res.AverageRespTime, 10)
-		assert.InDelta(t, 50, res.MinRespTime, 10)
-		assert.InDelta(t, 50, res.MaxRespTime, 10)
+		assert.True(t, res.RequestsSec <= 20 && res.RequestsSec >= 10, res.RequestsSec)
+		assert.InDelta(t, 50000, res.AverageRespTime, 10000)
+		assert.InDelta(t, 50000, res.MinRespTime, 10000)
+		assert.InDelta(t, 50000, res.MaxRespTime, 10000)
 		assert.True(t, res.MaxRespTime >= res.MinRespTime)
 	}
 }
