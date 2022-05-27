@@ -130,9 +130,9 @@ example with chi router:
 ```go
     router := chi.NewRouter()
 	bench = rest.NewBenchmarks()
-    router.Use(bench.Middleware)
+	router.Use(bench.Middleware)
 	...
-    router.Get("/bench", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/bench", func(w http.ResponseWriter, r *http.Request) {
         resp := struct {
             OneMin     rest.BenchmarkStats `json:"1min"`
             FiveMin    rest.BenchmarkStats `json:"5min"`
@@ -142,7 +142,7 @@ example with chi router:
             bench.Stats(time.Minute * 5),
             bench.Stats(time.Minute * 15),
         }
-		render.JSON(w, r, resp) 		
+        render.JSON(w, r, resp) 		
     })
 ```
 
