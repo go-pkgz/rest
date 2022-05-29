@@ -32,8 +32,8 @@ type benchData struct {
 
 // BenchmarkStats holds the stats for a given interval
 type BenchmarkStats struct {
-	Requests        int     `json:"total_requests"`
-	RequestsSec     float64 `json:"total_requests_sec"`
+	Requests        int     `json:"requests"`
+	RequestsSec     float64 `json:"requests_sec"`
 	AverageRespTime int64   `json:"average_resp_time"`
 	MinRespTime     int64   `json:"min_resp_time"`
 	MaxRespTime     int64   `json:"max_resp_time"`
