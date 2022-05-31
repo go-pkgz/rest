@@ -52,6 +52,59 @@ func TestBenchmark_Stats2s(t *testing.T) {
 		MinRespTime: (time.Millisecond * 50).Microseconds(), MaxRespTime: (time.Millisecond * 250).Microseconds()}, res)
 }
 
+func TestBenchmark_WithTimeRange(t *testing.T) {
+
+	nowFn := func(dt time.Time) func() time.Time {
+		return func() time.Time { return dt }
+	}
+
+	{
+		bench := NewBenchmarks().WithTimeRange(time.Minute)
+
+		bench.nowFn = nowFn(time.Date(2018, time.January, 1, 0, 0, 0, 0, time.UTC))
+		bench.update(time.Millisecond * 50)
+		bench.update(time.Millisecond * 150)
+		bench.update(time.Millisecond * 250)
+		bench.update(time.Millisecond * 100)
+
+		bench.nowFn = nowFn(time.Date(2018, time.January, 1, 1, 0, 0, 0, time.UTC)) // 1 hour later
+		bench.update(time.Millisecond * 1000)
+
+		res := bench.Stats(time.Minute)
+		t.Logf("%+v", res)
+		assert.Equal(t, BenchmarkStats{Requests: 1, RequestsSec: 1, AverageRespTime: 1000000,
+			MinRespTime: (time.Millisecond * 1000).Microseconds(), MaxRespTime: (time.Millisecond * 1000).Microseconds()}, res)
+
+		res = bench.Stats(time.Hour)
+		t.Logf("%+v", res)
+		assert.Equal(t, BenchmarkStats{Requests: 1, RequestsSec: 1, AverageRespTime: 1000000,
+			MinRespTime: (time.Millisecond * 1000).Microseconds(), MaxRespTime: (time.Millisecond * 1000).Microseconds()}, res)
+	}
+
+	{
+		bench := NewBenchmarks().WithTimeRange(time.Hour * 2)
+
+		bench.nowFn = nowFn(time.Date(2018, time.January, 1, 0, 0, 0, 0, time.UTC))
+		bench.update(time.Millisecond * 50)
+		bench.update(time.Millisecond * 150)
+		bench.update(time.Millisecond * 250)
+		bench.update(time.Millisecond * 100)
+
+		bench.nowFn = nowFn(time.Date(2018, time.January, 1, 1, 0, 0, 0, time.UTC)) // 1 hour later
+		bench.update(time.Millisecond * 1000)
+
+		res := bench.Stats(time.Minute)
+		t.Logf("%+v", res)
+		assert.Equal(t, BenchmarkStats{Requests: 1, RequestsSec: 1, AverageRespTime: 1000000,
+			MinRespTime: (time.Millisecond * 1000).Microseconds(), MaxRespTime: (time.Millisecond * 1000).Microseconds()}, res)
+
+		res = bench.Stats(time.Hour)
+		t.Logf("%+v", res)
+		assert.Equal(t, BenchmarkStats{Requests: 5, RequestsSec: 0.0013885031935573452, AverageRespTime: 310000,
+			MinRespTime: (time.Millisecond * 50).Microseconds(), MaxRespTime: (time.Millisecond * 1000).Microseconds()}, res)
+	}
+}
+
 func TestBenchmark_Cleanup(t *testing.T) {
 	bench := NewBenchmarks()
 	for i := 0; i < 1000; i++ {

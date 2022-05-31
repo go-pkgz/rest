@@ -7,16 +7,17 @@ import (
 	"time"
 )
 
-var maxTimeRange = time.Duration(15) * time.Minute
+var maxTimeRangeDefault = time.Duration(15) * time.Minute
 
 // Benchmarks is a basic benchmarking middleware collecting and reporting performance metrics
 // It keeps track of the requests speeds and counts in 1s benchData buckets ,limiting the number of buckets
 // to maxTimeRange. User can request the benchmark for any time duration. This is intended to be used
 // for retrieving the benchmark data for the last minute, 5 minutes and up to maxTimeRange.
 type Benchmarks struct {
-	st   time.Time
-	data *list.List
-	lock sync.RWMutex
+	st           time.Time
+	data         *list.List
+	lock         sync.RWMutex
+	maxTimeRange time.Duration
 
 	nowFn func() time.Time // for testing only
 }
@@ -42,11 +43,23 @@ type BenchmarkStats struct {
 // NewBenchmarks creates a new benchmark middleware
 func NewBenchmarks() *Benchmarks {
 	res := &Benchmarks{
-		st:    time.Now(),
-		data:  list.New(),
-		nowFn: time.Now,
+		st:           time.Now(),
+		data:         list.New(),
+		nowFn:        time.Now,
+		maxTimeRange: maxTimeRangeDefault,
 	}
 	return res
+}
+
+// WithTimeRange sets the maximum time range for the benchmark to keep data for.
+// Default is 15 minutes. The increase of this range will change memory utilization as each second of the range
+// kept as benchData aggregate. The default means 15*60 = 900 seconds of data aggregate.
+// Larger range allows for longer time periods to be benchmarked.
+func (b *Benchmarks) WithTimeRange(max time.Duration) *Benchmarks {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	b.maxTimeRange = max
+	return b
 }
 
 // Handler calculates 1/5/10m request per second and allows to access those values
@@ -70,7 +83,7 @@ func (b *Benchmarks) update(reqDuration time.Duration) {
 
 	// keep maxTimeRange in the list, drop the rest
 	for e := b.data.Front(); e != nil; e = e.Next() {
-		if b.data.Front().Value.(benchData).ts.After(b.nowFn().Add(-maxTimeRange)) {
+		if b.data.Front().Value.(benchData).ts.After(b.nowFn().Add(-b.maxTimeRange)) {
 			break
 		}
 		b.data.Remove(b.data.Front())
