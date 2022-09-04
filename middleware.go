@@ -69,7 +69,7 @@ func Health(path string, checkers ...func(ctx context.Context) (name string, err
 
 	return func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != "GET" || strings.ToLower(r.URL.Path) != path {
+			if r.Method != "GET" || !strings.EqualFold(r.URL.Path, path) {
 				h.ServeHTTP(w, r) // not the health check request, continue the chain
 				return
 			}
