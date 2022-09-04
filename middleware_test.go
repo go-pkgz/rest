@@ -2,6 +2,8 @@ package rest
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,9 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-pkgz/rest/realip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/go-pkgz/rest/realip"
 )
 
 func TestMiddleware_AppInfo(t *testing.T) {
@@ -193,6 +196,64 @@ func TestRealIP(t *testing.T) {
 	req.Header.Add("X-Real-IP", "1.2.3.4")
 	_, err = client.Do(req)
 	require.NoError(t, err)
+}
+
+func TestHealthPassed(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+
+	check1 := func(ctx context.Context) (string, error) {
+		return "check1", nil
+	}
+	check2 := func(ctx context.Context) (string, error) {
+		return "check2", nil
+	}
+
+	ts := httptest.NewServer(Health("/health", check1, check2)(handler))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/health")
+	require.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, `[{"name":"check1","status":"ok"},{"name":"check2","status":"ok"}]`+"\n", string(b))
+
+	resp, err = http.Get(ts.URL + "/blah")
+	require.Nil(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	defer resp.Body.Close()
+	b, err = io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, "blah blah", string(b))
+}
+
+func TestHealthFailed(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+
+	check1 := func(ctx context.Context) (string, error) {
+		return "check1", nil
+	}
+	check2 := func(ctx context.Context) (string, error) {
+		return "check2", errors.New("some error")
+	}
+
+	ts := httptest.NewServer(Health("/health", check1, check2)(handler))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/health")
+	require.Nil(t, err)
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, `[{"name":"check1","status":"ok"},{"name":"check2","status":"failed","error":"some error"}]`+"\n", string(b))
 }
 
 type mockLgr struct {

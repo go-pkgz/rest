@@ -36,6 +36,43 @@ Org: Umputun
 pong
 ```
 
+### Health middleware
+
+Responds with the status 200 if all health checks passed, 503 if any failed. Both health path and check functions passed by consumer.
+For production usage this middleware should be used with throttler/limiter and, optionally, with some auth middlewares
+
+Example of usage:
+
+```go
+    check1 := func(ctx context.Context) (name string, err error) {
+        // do some check, for example check DB connection		
+		return "check1", nil // all good, passed
+    }
+    check2 := func(ctx context.Context) (name string, err error) {
+        // do some other check, for example ping an external service		
+		return "check2", errors.New("some error") // check failed
+    }
+
+    router := chi.NewRouter()
+	router.Use(rest.Health("/health", check1, check2))
+```
+
+example of the actual call and response:
+
+```
+> http GET https://example.com/health
+
+HTTP/1.1 503 Service Unavailable
+Date: Sun, 15 Jul 2018 19:40:31 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+
+[
+    {"name":"check1","status":"ok"},
+    {"name":"check2","status":"failed","error":"some error"}
+]
+```
+
 ### Logger middleware
 
 Logs request, request handling time and response. Log record fields in order of occurrence:
