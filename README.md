@@ -73,6 +73,8 @@ Content-Length: 36
 ]
 ```
 
+_this middleware is pretty basic, but can be used for simple health checks. For more complex cases, like async/cached health checks see [alexliesenfeld/health](https://github.com/alexliesenfeld/health)_
+
 ### Logger middleware
 
 Logs request, request handling time and response. Log record fields in order of occurrence:
