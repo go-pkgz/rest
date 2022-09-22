@@ -291,7 +291,7 @@ func TestReject(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 		b, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
-		assert.Equal(t, `no no`, string(b))
+		assert.Equal(t, "no no\n", string(b))
 	}
 }
 
