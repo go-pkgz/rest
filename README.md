@@ -158,6 +158,32 @@ Maybe middleware will allow you to change the flow of the middleware stack execu
 value of maybeFn(request). This is useful for example if you'd like to skip a middleware handler if
 a request does not satisfy the maybeFn logic.
 
+### Reject middleware
+
+Reject is a middleware that rejects requests with a given status code and message based on a user-defined function.
+This is useful for example if you'd like to reject requests to a particular resource based on a request header, or want to implement a conditional request handler based on service parameters.
+
+example with chi router:
+
+```go
+    router := chi.NewRouter()
+	bench = rest.NewBenchmarks()
+	router.Use(bench.Middleware)
+	...
+	router.Get("/bench", func(w http.ResponseWriter, r *http.Request) {
+        resp := struct {
+            OneMin     rest.BenchmarkStats `json:"1min"`
+            FiveMin    rest.BenchmarkStats `json:"5min"`
+            FifteenMin rest.BenchmarkStats `json:"15min"`
+        }{
+            bench.Stats(time.Minute),
+            bench.Stats(time.Minute * 5),
+            bench.Stats(time.Minute * 15),
+        }
+        render.JSON(w, r, resp) 		
+    })
+```
+
 ### Benchmarks middleware
 
 Benchmarks middleware allows to measure the time of request handling, number of request per second and report aggregated metrics. This middleware keeps track of the request in the memory and keep up to 900 points (15 minutes, data-point per second).

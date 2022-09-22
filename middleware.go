@@ -167,3 +167,18 @@ func RealIP(h http.Handler) http.Handler {
 
 	return http.HandlerFunc(fn)
 }
+
+// Reject is a middleware that conditionally rejects requests with a given status code and message.
+// user-defined condition function rejectFn is used to determine if the request should be rejected.
+func Reject(errCode int, errMsg string, rejectFn func(r *http.Request) bool) func(h http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			if rejectFn(r) {
+				http.Error(w, errMsg, errCode)
+				return
+			}
+			h.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(fn)
+	}
+}

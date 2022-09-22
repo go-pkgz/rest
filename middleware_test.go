@@ -256,6 +256,45 @@ func TestHealthFailed(t *testing.T) {
 	assert.Equal(t, `[{"name":"check1","status":"ok"},{"name":"check2","status":"failed","error":"some error"}]`+"\n", string(b))
 }
 
+func TestReject(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+
+	rej := Reject(http.StatusForbidden, "no no", func(r *http.Request) bool {
+		return r.Header.Get("h1") == "v1"
+	})
+
+	ts := httptest.NewServer(rej(handler))
+	defer ts.Close()
+
+	client := http.Client{Timeout: time.Second}
+	{ // not rejected
+		req, err := http.NewRequest("GET", ts.URL+"/something", http.NoBody)
+		require.NoError(t, err)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		b, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, `blah blah`, string(b))
+	}
+	{ // rejected
+		req, err := http.NewRequest("GET", ts.URL+"/something", http.NoBody)
+		req.Header.Add("h1", "v1")
+		require.NoError(t, err)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		b, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, `no no`, string(b))
+	}
+}
+
 type mockLgr struct {
 	buf bytes.Buffer
 }
