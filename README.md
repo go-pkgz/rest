@@ -167,21 +167,12 @@ example with chi router:
 
 ```go
     router := chi.NewRouter()
-	bench = rest.NewBenchmarks()
-	router.Use(bench.Middleware)
-	...
-	router.Get("/bench", func(w http.ResponseWriter, r *http.Request) {
-        resp := struct {
-            OneMin     rest.BenchmarkStats `json:"1min"`
-            FiveMin    rest.BenchmarkStats `json:"5min"`
-            FifteenMin rest.BenchmarkStats `json:"15min"`
-        }{
-            bench.Stats(time.Minute),
-            bench.Stats(time.Minute * 5),
-            bench.Stats(time.Minute * 15),
-        }
-        render.JSON(w, r, resp) 		
-    })
+	
+	rejectFn := func(r *http.Request) (bool) {
+        return r.Header.Get("X-Request-Id") == "" // reject if no X-Request-Id header
+    }
+	
+	router.Use(rest.Reject(http.StatusBadRequest, "X-Request-Id header is required", rejectFn))
 ```
 
 ### Benchmarks middleware
