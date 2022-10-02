@@ -3,7 +3,6 @@ package rest
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -241,7 +240,7 @@ func TestHealthFailed(t *testing.T) {
 		return "check1", nil
 	}
 	check2 := func(ctx context.Context) (string, error) {
-		return "check2", errors.New("some error")
+		return "check2", fmt.Errorf("some error")
 	}
 
 	ts := httptest.NewServer(Health("/health", check1, check2)(handler))

@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -61,7 +60,7 @@ func errDetailsMsg(r *http.Request, code int, err error, msg string) string {
 		remoteIP = remoteIP[:pos]
 	}
 	if err == nil {
-		err = errors.New("no error")
+		err = fmt.Errorf("no error")
 	}
 	return fmt.Sprintf("%s - %v - %d - %s - %s%s", msg, err, code, remoteIP, q, srcFileInfo)
 }

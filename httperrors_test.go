@@ -1,7 +1,7 @@
 package rest
 
 import (
-	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,7 +16,7 @@ func TestSendErrorJSON(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/error" {
 			t.Log("http err request", r.URL)
-			SendErrorJSON(w, r, l, 500, errors.New("error 500"), "error details 123456")
+			SendErrorJSON(w, r, l, 500, fmt.Errorf("error 500"), "error details 123456")
 			return
 		}
 		w.WriteHeader(404)
@@ -40,7 +40,7 @@ func TestErrorDetailsMsg(t *testing.T) {
 		req, err := http.NewRequest("GET", "https://example.com/test?k1=v1&k2=v2", http.NoBody)
 		require.Nil(t, err)
 		req.RemoteAddr = "1.2.3.4"
-		msg := errDetailsMsg(req, 500, errors.New("error 500"), "error details 123456")
+		msg := errDetailsMsg(req, 500, fmt.Errorf("error 500"), "error details 123456")
 		assert.Contains(t, msg, "error details 123456 - error 500 - 500 - 1.2.3.4 - https://example."+
 			"com/test?k1=v1&k2=v2 [caused by")
 		assert.Contains(t, msg, "rest/httperrors_test.go:49 rest.TestErrorDetailsMsg]", msg)
@@ -67,7 +67,7 @@ func TestErrorLogger_Log(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/error" {
 			t.Log("http err request", r.URL)
-			errLogger.Log(w, r, 500, errors.New("error 500"), "error details 123456")
+			errLogger.Log(w, r, 500, fmt.Errorf("error 500"), "error details 123456")
 			return
 		}
 		w.WriteHeader(404)

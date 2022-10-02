@@ -2,7 +2,7 @@ package rest
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -97,13 +97,13 @@ func TestParseFromTo(t *testing.T) {
 		},
 		{
 			query: "from=2022-04-06T18:30:25&to=xyzbad",
-			err:   errors.New(`incorrect to time: can't parse date "xyzbad"`),
+			err:   fmt.Errorf(`incorrect to time: can't parse date "xyzbad"`),
 		},
 		{
 			query: "from=123455&to=2022-05-01T17:50",
-			err:   errors.New(`incorrect from time: can't parse date "123455"`),
+			err:   fmt.Errorf(`incorrect from time: can't parse date "123455"`),
 		},
-		{"", time.Time{}, time.Time{}, errors.New("incorrect from time: can't parse date \"\"")},
+		{"", time.Time{}, time.Time{}, fmt.Errorf("incorrect from time: can't parse date \"\"")},
 	}
 
 	for i, tt := range tbl {

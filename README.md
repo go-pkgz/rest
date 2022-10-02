@@ -50,7 +50,7 @@ Example of usage:
     }
     check2 := func(ctx context.Context) (name string, err error) {
         // do some other check, for example ping an external service		
-		return "check2", errors.New("some error") // check failed
+		return "check2", fmt.Errorf("some error") // check failed
     }
 
     router := chi.NewRouter()

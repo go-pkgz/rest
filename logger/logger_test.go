@@ -2,7 +2,6 @@ package logger
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -339,7 +338,7 @@ func TestPeek(t *testing.T) {
 type errReader struct{}
 
 func (errReader) Read(_ []byte) (n int, err error) {
-	return 0, errors.New("test error")
+	return 0, fmt.Errorf("test error")
 }
 
 func TestSanitizeReqURL(t *testing.T) {
