@@ -43,5 +43,5 @@ func BasicAuthWithUserPasswd(user, passwd string) func(http.Handler) http.Handle
 // it can be used in handlers to check if BasicAuth middleware was applied
 func IsAuthorized(ctx context.Context) bool {
 	v := ctx.Value(contextKey(baContextKey))
-	return nil != v && v.(bool)
+	return v != nil && v.(bool)
 }
