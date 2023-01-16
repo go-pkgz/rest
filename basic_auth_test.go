@@ -17,7 +17,13 @@ func TestBasicAuth(t *testing.T) {
 		return user == "dev" && passwd == "good"
 	})
 
-	ts := httptest.NewServer(mw(getTestHandlerBlah()))
+	ts := httptest.NewServer(mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("request %s", r.URL)
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte("blah"))
+		require.NoError(t, err)
+		assert.True(t, IsAuthorized(r.Context()))
+	})))
 	defer ts.Close()
 
 	u := fmt.Sprintf("%s%s", ts.URL, "/something")
@@ -41,6 +47,48 @@ func TestBasicAuth(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	}
 
+	{
+		req, err := http.NewRequest("GET", u, http.NoBody)
+		require.NoError(t, err)
+		req.SetBasicAuth("dev", "bad")
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	}
+}
+
+func TestBasicAuthWithUserPasswd(t *testing.T) {
+	mw := BasicAuthWithUserPasswd("dev", "good")
+
+	ts := httptest.NewServer(mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("request %s", r.URL)
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte("blah"))
+		require.NoError(t, err)
+		assert.True(t, IsAuthorized(r.Context()))
+	})))
+	defer ts.Close()
+
+	u := fmt.Sprintf("%s%s", ts.URL, "/something")
+
+	client := http.Client{Timeout: 5 * time.Second}
+
+	{
+		req, err := http.NewRequest("GET", u, http.NoBody)
+		require.NoError(t, err)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	}
+
+	{
+		req, err := http.NewRequest("GET", u, http.NoBody)
+		require.NoError(t, err)
+		req.SetBasicAuth("dev", "good")
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	}
 	{
 		req, err := http.NewRequest("GET", u, http.NoBody)
 		require.NoError(t, err)
