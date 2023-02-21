@@ -32,7 +32,7 @@ func TestLoggerMinimal(t *testing.T) {
 
 	resp, err := http.Post(ts.URL+"/blah", "", bytes.NewBufferString("1234567890 abcdefg"))
 	require.Nil(t, err)
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint
 	assert.Equal(t, 200, resp.StatusCode)
 	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
@@ -63,7 +63,7 @@ func TestLoggerMinimalLocalhost(t *testing.T) {
 	port := strings.Split(ts.URL, ":")[2]
 	resp, err := http.Post("http://localhost:"+port+"/blah", "", bytes.NewBufferString("1234567890 abcdefg"))
 	require.Nil(t, err)
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint
 	assert.Equal(t, 200, resp.StatusCode)
 	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
@@ -104,7 +104,7 @@ func TestLogger(t *testing.T) {
 	resp, err := http.Post(ts.URL+"/blah?password=secret&key=val&var=123", "", bytes.NewBufferString("1234567890 abcdefg"))
 	require.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint
 	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "blah blah", string(b))
