@@ -93,6 +93,31 @@ func TestGetFromHeaders(t *testing.T) {
 		assert.Error(t, err)
 		assert.Equal(t, "", ip)
 	})
+	t.Run("X-Real-IP IPv6", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/something", http.NoBody)
+		assert.NoError(t, err)
+		req.Header.Add("X-Real-IP", "2001:0db8:85a3:0000:0000:8a2e:0370:7334")
+		adr, err := Get(req)
+		require.NoError(t, err)
+		assert.Equal(t, "2001:0db8:85a3:0000:0000:8a2e:0370:7334", adr)
+	})
+	t.Run("X-Forwarded-For last IPv6 public", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/something", http.NoBody)
+		assert.NoError(t, err)
+		req.Header.Add("X-Forwarded-For", "2001:db8::ff00:42:8329,::1,fc00::")
+		adr, err := Get(req)
+		require.NoError(t, err)
+		assert.Equal(t, "2001:db8::ff00:42:8329", adr)
+	})
+
+	t.Run("RemoteAddr IPv6 fallback", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/something", http.NoBody)
+		assert.NoError(t, err)
+		req.RemoteAddr = "[2001:db8::ff00:42:8329]:1234"
+		adr, err := Get(req)
+		require.NoError(t, err)
+		assert.Equal(t, "2001:db8::ff00:42:8329", adr)
+	})
 }
 
 func TestGetFromRemoteAddr(t *testing.T) {
