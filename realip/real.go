@@ -25,7 +25,7 @@ var privateRanges = []ipRange{
 
 // Get returns real ip from the given request
 func Get(r *http.Request) (string, error) {
-
+	var firstIP string
 	for _, h := range []string{"X-Forwarded-For", "X-Real-Ip"} {
 		addresses := strings.Split(r.Header.Get(h), ",")
 		// march from right to left until we get a public address
@@ -33,6 +33,9 @@ func Get(r *http.Request) (string, error) {
 		for i := len(addresses) - 1; i >= 0; i-- {
 			ip := strings.TrimSpace(addresses[i])
 			realIP := net.ParseIP(ip)
+			if firstIP == "" && realIP != nil {
+				firstIP = ip
+			}
 			if !realIP.IsGlobalUnicast() || isPrivateSubnet(realIP) {
 				continue
 			}
@@ -40,9 +43,9 @@ func Get(r *http.Request) (string, error) {
 		}
 	}
 
-	// X-Forwarded-For header set but parsing failed above
-	if r.Header.Get("X-Forwarded-For") != "" {
-		return "", fmt.Errorf("no valid ip found")
+	// if we cannot find a public address in X-Forwarded-For or X-Real-IP headers, fallback to first ip
+	if firstIP != "" {
+		return firstIP, nil
 	}
 
 	// get IP from RemoteAddr

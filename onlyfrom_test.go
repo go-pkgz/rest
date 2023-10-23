@@ -10,8 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOnlyFromAllowed(t *testing.T) {
-
+func TestOnlyFromAllowedIP(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
@@ -30,7 +29,6 @@ func TestOnlyFromAllowed(t *testing.T) {
 }
 
 func TestOnlyFromAllowedHeaders(t *testing.T) {
-
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
@@ -48,26 +46,32 @@ func TestOnlyFromAllowedHeaders(t *testing.T) {
 	}
 	client := http.Client{}
 
-	req, err := reqWithHeader("X-Real-IP")
-	require.NoError(t, err)
-	resp, err := client.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	assert.Equal(t, 200, resp.StatusCode)
+	t.Run("X-Real-IP", func(t *testing.T) {
+		req, err := reqWithHeader("X-Real-IP")
+		require.NoError(t, err)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, 200, resp.StatusCode)
+	})
 
-	req, err = reqWithHeader("X-Forwarded-For")
-	require.NoError(t, err)
-	resp, err = client.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	assert.Equal(t, 200, resp.StatusCode)
+	t.Run("X-Forwarded-For", func(t *testing.T) {
+		req, err := reqWithHeader("X-Forwarded-For")
+		require.NoError(t, err)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, 200, resp.StatusCode)
+	})
 
-	req, err = reqWithHeader("RemoteAddr")
-	require.NoError(t, err)
-	resp, err = client.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	assert.Equal(t, 200, resp.StatusCode)
+	t.Run("X-Forwarded-For and X-Real-IP missing", func(t *testing.T) {
+		req, err := reqWithHeader("blah")
+		require.NoError(t, err)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, 403, resp.StatusCode)
+	})
 }
 
 func TestOnlyFromAllowedCIDR(t *testing.T) {
