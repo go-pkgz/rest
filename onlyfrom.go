@@ -19,7 +19,12 @@ func OnlyFrom(onlyIps ...string) func(http.Handler) http.Handler {
 				h.ServeHTTP(w, r)
 				return
 			}
-			matched, ip := matchSourceIP(r, onlyIps)
+			matched, ip, err := matchSourceIP(r, onlyIps)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				RenderJSON(w, JSON{"error": fmt.Sprintf("can't get realip: %s", err)})
+				return
+			}
 			if matched {
 				// matched ip - allow
 				h.ServeHTTP(w, r)
@@ -27,28 +32,28 @@ func OnlyFrom(onlyIps ...string) func(http.Handler) http.Handler {
 			}
 
 			w.WriteHeader(http.StatusForbidden)
-			RenderJSON(w, JSON{"error": fmt.Sprintf("ip %s rejected", ip)})
+			RenderJSON(w, JSON{"error": fmt.Sprintf("ip %q rejected", ip)})
 		}
 		return http.HandlerFunc(fn)
 	}
 }
 
 // matchSourceIP returns true if request's ip matches any of ips
-func matchSourceIP(r *http.Request, ips []string) (result bool, match string) {
+func matchSourceIP(r *http.Request, ips []string) (result bool, match string, err error) {
 	ip, err := realip.Get(r)
 	if err != nil {
-		return false, "" // we can't get ip, so no match
+		return false, "", fmt.Errorf("can't get realip: %w", err) // we can't get ip, so no match
 	}
 	// check for ip prefix or CIDR
 	for _, exclIP := range ips {
 		if _, cidrnet, err := net.ParseCIDR(exclIP); err == nil {
 			if cidrnet.Contains(net.ParseIP(ip)) {
-				return true, ip
+				return true, ip, nil
 			}
 		}
 		if strings.HasPrefix(ip, exclIP) {
-			return true, ip
+			return true, ip, nil
 		}
 	}
-	return false, ip
+	return false, ip, nil
 }

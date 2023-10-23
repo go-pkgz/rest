@@ -112,3 +112,41 @@ func TestOnlyFromRejected(t *testing.T) {
 	defer resp.Body.Close()
 	assert.Equal(t, 403, resp.StatusCode)
 }
+
+func TestOnlyFromErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		remoteAddr string
+		status     int
+	}{
+		{
+			name:       "Invalid RemoteAddr",
+			remoteAddr: "bad-addr",
+			status:     http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				r.RemoteAddr = tt.remoteAddr
+				OnlyFrom("1.1.1.1")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, err := w.Write([]byte("blah blah"))
+					require.NoError(t, err)
+				})).ServeHTTP(w, r)
+			})
+
+			ts := httptest.NewServer(handler)
+			defer ts.Close()
+
+			req, err := http.NewRequest("GET", ts.URL+"/blah", http.NoBody)
+			require.NoError(t, err)
+
+			client := http.Client{}
+			resp, err := client.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			assert.Equal(t, tt.status, resp.StatusCode)
+		})
+	}
+}
