@@ -133,7 +133,7 @@ func TestWrap(t *testing.T) {
 }
 
 func TestHeaders(t *testing.T) {
-	req := httptest.NewRequest("GET", "/something", nil)
+	req := httptest.NewRequest("GET", "/something", http.NoBody)
 	w := httptest.NewRecorder()
 
 	h := Headers("h1:v1", "bad", "h2:v2")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
@@ -153,7 +153,7 @@ func TestMaybe(t *testing.T) {
 	})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
 	{
-		req := httptest.NewRequest("GET", "/something", nil)
+		req := httptest.NewRequest("GET", "/something", http.NoBody)
 		w := httptest.NewRecorder()
 
 		h.ServeHTTP(w, req)
@@ -165,7 +165,7 @@ func TestMaybe(t *testing.T) {
 		assert.Equal(t, 2, len(req.Header))
 	}
 	{
-		req := httptest.NewRequest("GET", "/something", nil)
+		req := httptest.NewRequest("GET", "/something", http.NoBody)
 		w := httptest.NewRecorder()
 
 		h.ServeHTTP(w, req)
