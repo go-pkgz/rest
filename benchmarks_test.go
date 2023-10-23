@@ -121,7 +121,7 @@ func TestBenchmark_Cleanup(t *testing.T) {
 			MinRespTime: (time.Millisecond * 50).Microseconds(), MaxRespTime: (time.Millisecond * 50).Microseconds()}, res)
 	}
 	{
-		res := bench.Stats(time.Minute - time.Second)
+		res := bench.Stats(time.Minute)
 		t.Logf("%+v", res)
 		assert.Equal(t, BenchmarkStats{Requests: 60, RequestsSec: 1, AverageRespTime: 50000,
 			MinRespTime: (time.Millisecond * 50).Microseconds(), MaxRespTime: (time.Millisecond * 50).Microseconds()}, res)
