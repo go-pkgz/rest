@@ -27,6 +27,7 @@ var privateRanges = []ipRange{
 }
 
 // Get returns real ip from the given request
+// Prioritize public IPs over private IPs
 func Get(r *http.Request) (string, error) {
 	var firstIP string
 	for _, h := range []string{"X-Forwarded-For", "X-Real-Ip"} {
@@ -59,17 +60,18 @@ func Get(r *http.Request) (string, error) {
 	return ip, nil
 }
 
-// inRange - check to see if a given ip address is within a range given
-func inRange(r ipRange, ipAddress net.IP) bool {
-	// ensure the IPs are in the same format for comparison
-	ipAddress = ipAddress.To16()
-	r.start = r.start.To16()
-	r.end = r.end.To16()
-	return bytes.Compare(ipAddress, r.start) >= 0 && bytes.Compare(ipAddress, r.end) <= 0
-}
-
 // isPrivateSubnet - check to see if this ip is in a private subnet
 func isPrivateSubnet(ipAddress net.IP) bool {
+
+	// inRange - check to see if a given ip address is within a range given
+	inRange := func(r ipRange, ipAddress net.IP) bool {
+		// ensure the IPs are in the same format for comparison
+		ipAddress = ipAddress.To16()
+		r.start = r.start.To16()
+		r.end = r.end.To16()
+		return bytes.Compare(ipAddress, r.start) >= 0 && bytes.Compare(ipAddress, r.end) <= 0
+	}
+
 	for _, r := range privateRanges {
 		if inRange(r, ipAddress) {
 			return true

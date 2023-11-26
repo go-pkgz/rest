@@ -39,6 +39,15 @@ func TestGetFromHeaders(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "1.1.1.2", adr)
 	})
+	t.Run("X-Forwarded-For public im the middle", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/something", http.NoBody)
+		assert.NoError(t, err)
+		req.Header.Add("Something", "1234567")
+		req.Header.Add("X-Forwarded-For", "192.168.1.1, 8.8.8.8, 10.0.0.65")
+		adr, err := Get(req)
+		require.NoError(t, err)
+		assert.Equal(t, "8.8.8.8", adr)
+	})
 	t.Run("X-Forwarded-For all private", func(t *testing.T) {
 		req, err := http.NewRequest("GET", "/something", http.NoBody)
 		assert.NoError(t, err)
@@ -68,7 +77,7 @@ func TestGetFromHeaders(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "30.30.30.1", adr)
 	})
-	t.Run("X-Forwarded-For private and X-Real-IP public]", func(t *testing.T) {
+	t.Run("X-Forwarded-For private and X-Real-IP public", func(t *testing.T) {
 		req, err := http.NewRequest("GET", "/something", http.NoBody)
 		assert.NoError(t, err)
 		req.Header.Add("Something", "1234567")
