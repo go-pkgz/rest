@@ -23,7 +23,7 @@ func TestMiddleware_AppInfo(t *testing.T) {
 	err := os.Setenv("MHOST", "host1")
 	assert.NoError(t, err)
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err = w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -47,7 +47,7 @@ func TestMiddleware_AppInfo(t *testing.T) {
 
 func TestMiddleware_Ping(t *testing.T) {
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -105,7 +105,7 @@ func TestMiddleware_Recoverer(t *testing.T) {
 }
 
 func TestWrap(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		t.Logf("%s", r.URL.String())
 		assert.Equal(t, "/something/1/2", r.URL.Path)
 	})
@@ -136,7 +136,7 @@ func TestHeaders(t *testing.T) {
 	req := httptest.NewRequest("GET", "/something", http.NoBody)
 	w := httptest.NewRecorder()
 
-	h := Headers("h1:v1", "bad", "h2:v2")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	h := Headers("h1:v1", "bad", "h2:v2")(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	h.ServeHTTP(w, req)
 	resp := w.Result()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -148,9 +148,9 @@ func TestHeaders(t *testing.T) {
 
 func TestMaybe(t *testing.T) {
 	var count int32
-	h := Maybe(Headers("h1:v1", "bad", "h2:v2"), func(r *http.Request) bool {
+	h := Maybe(Headers("h1:v1", "bad", "h2:v2"), func(*http.Request) bool {
 		return atomic.AddInt32(&count, 1) == 1
-	})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	})(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 
 	{
 		req := httptest.NewRequest("GET", "/something", http.NoBody)
@@ -180,7 +180,7 @@ func TestMaybe(t *testing.T) {
 
 func TestRealIP(t *testing.T) {
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		t.Logf("%v", r)
 		require.Equal(t, "1.2.3.4", r.RemoteAddr)
 		adr, err := realip.Get(r)
@@ -199,15 +199,15 @@ func TestRealIP(t *testing.T) {
 }
 
 func TestHealthPassed(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
 
-	check1 := func(ctx context.Context) (string, error) {
+	check1 := func(context.Context) (string, error) {
 		return "check1", nil
 	}
-	check2 := func(ctx context.Context) (string, error) {
+	check2 := func(context.Context) (string, error) {
 		return "check2", nil
 	}
 
@@ -232,15 +232,15 @@ func TestHealthPassed(t *testing.T) {
 }
 
 func TestHealthFailed(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
 
-	check1 := func(ctx context.Context) (string, error) {
+	check1 := func(context.Context) (string, error) {
 		return "check1", nil
 	}
-	check2 := func(ctx context.Context) (string, error) {
+	check2 := func(context.Context) (string, error) {
 		return "check2", errors.New("some error")
 	}
 
@@ -257,7 +257,7 @@ func TestHealthFailed(t *testing.T) {
 }
 
 func TestReject(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})

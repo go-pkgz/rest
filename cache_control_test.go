@@ -31,7 +31,7 @@ func TestRest_cacheControl(t *testing.T) {
 			req := httptest.NewRequest("GET", tt.url, http.NoBody)
 			w := httptest.NewRecorder()
 
-			h := CacheControl(tt.exp, tt.version)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+			h := CacheControl(tt.exp, tt.version)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 			h.ServeHTTP(w, req)
 			resp := w.Result()
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -68,7 +68,7 @@ func TestCacheControlDynamic(t *testing.T) {
 			fn := func(r *http.Request) string {
 				return r.Header.Get("key")
 			}
-			h := CacheControlDynamic(tt.exp, fn)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+			h := CacheControlDynamic(tt.exp, fn)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 			h.ServeHTTP(w, req)
 			resp := w.Result()
 			assert.Equal(t, http.StatusOK, resp.StatusCode)

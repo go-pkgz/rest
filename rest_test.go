@@ -16,7 +16,7 @@ import (
 )
 
 func TestRest_RenderJSON(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		j := JSON{"key1": 1, "key2": "222"}
 		RenderJSON(w, j)
 	}))
@@ -164,7 +164,7 @@ func TestEncodeJSONResponse(t *testing.T) {
 }
 
 func getTestHandlerBlah() http.HandlerFunc {
-	fn := func(rw http.ResponseWriter, req *http.Request) {
+	fn := func(rw http.ResponseWriter, _ *http.Request) {
 		_, _ = rw.Write([]byte("blah"))
 	}
 	return fn

@@ -12,7 +12,7 @@ import (
 func TestNoCache(t *testing.T) {
 
 	rr := httptest.NewRecorder()
-	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	testHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		t.Logf("%+v", r)
 	})
 

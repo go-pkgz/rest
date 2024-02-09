@@ -130,7 +130,7 @@ func TestGetFromHeaders(t *testing.T) {
 }
 
 func TestGetFromRemoteAddr(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		log.Printf("%v", r)
 		adr, err := Get(r)
 		require.NoError(t, err)

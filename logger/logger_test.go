@@ -19,7 +19,7 @@ import (
 
 func TestLoggerMinimal(t *testing.T) {
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -49,7 +49,7 @@ func TestLoggerMinimal(t *testing.T) {
 
 func TestLoggerMinimalLocalhost(t *testing.T) {
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -79,7 +79,7 @@ func TestLoggerMinimalLocalhost(t *testing.T) {
 
 func TestLogger(t *testing.T) {
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -90,10 +90,10 @@ func TestLogger(t *testing.T) {
 		IPfn(func(ip string) string {
 			return ip + "!masked"
 		}),
-		UserFn(func(r *http.Request) (string, error) {
+		UserFn(func(*http.Request) (string, error) {
 			return "user", nil
 		}),
-		SubjFn(func(r *http.Request) (string, error) {
+		SubjFn(func(*http.Request) (string, error) {
 			return "subj", nil
 		}),
 	)
@@ -116,7 +116,7 @@ func TestLogger(t *testing.T) {
 }
 
 func TestLoggerIP(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -151,7 +151,7 @@ func TestLoggerIP(t *testing.T) {
 }
 
 func TestLoggerIPAnon(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -186,7 +186,7 @@ func TestLoggerIPAnon(t *testing.T) {
 }
 
 func TestLoggerTraceID(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -197,10 +197,10 @@ func TestLoggerTraceID(t *testing.T) {
 		IPfn(func(ip string) string {
 			return ip + "!masked"
 		}),
-		UserFn(func(r *http.Request) (string, error) {
+		UserFn(func(*http.Request) (string, error) {
 			return "user", nil
 		}),
-		SubjFn(func(r *http.Request) (string, error) {
+		SubjFn(func(*http.Request) (string, error) {
 			return "subj", nil
 		}),
 	)
@@ -262,7 +262,7 @@ func TestLoggerMaxBodySize(t *testing.T) {
 }
 
 func TestLoggerDefault(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -375,7 +375,7 @@ func TestSanitizeReqURL(t *testing.T) {
 
 func TestLoggerApacheCombined(t *testing.T) {
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -385,7 +385,7 @@ func TestLoggerApacheCombined(t *testing.T) {
 		IPfn(func(ip string) string {
 			return ip + "!masked"
 		}),
-		UserFn(func(r *http.Request) (string, error) {
+		UserFn(func(*http.Request) (string, error) {
 			return "user", nil
 		}),
 	)

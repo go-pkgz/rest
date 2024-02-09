@@ -12,7 +12,7 @@ import (
 )
 
 func TestMetrics(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -31,7 +31,7 @@ func TestMetrics(t *testing.T) {
 }
 
 func TestMetricsRejected(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})

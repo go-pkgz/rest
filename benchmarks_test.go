@@ -131,7 +131,7 @@ func TestBenchmark_Cleanup(t *testing.T) {
 }
 
 func TestBenchmarks_Handler(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		time.Sleep(time.Millisecond * 50)
 		require.NoError(t, err)

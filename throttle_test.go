@@ -16,7 +16,7 @@ func TestThrottle(t *testing.T) {
 
 	thrMw := Throttle(10)
 	var calls int32
-	ts := httptest.NewServer(thrMw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(thrMw(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&calls, 1)
 		time.Sleep(200 * time.Millisecond)
 	})))
@@ -61,7 +61,7 @@ func TestThrottleDisabled(t *testing.T) {
 
 	thrMw := Throttle(0)
 	var calls int32
-	ts := httptest.NewServer(thrMw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(thrMw(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&calls, 1)
 		time.Sleep(200 * time.Millisecond)
 	})))

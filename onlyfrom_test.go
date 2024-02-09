@@ -11,7 +11,7 @@ import (
 )
 
 func TestOnlyFromAllowedIP(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -29,7 +29,7 @@ func TestOnlyFromAllowedIP(t *testing.T) {
 }
 
 func TestOnlyFromAllowedHeaders(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -76,7 +76,7 @@ func TestOnlyFromAllowedHeaders(t *testing.T) {
 
 func TestOnlyFromAllowedCIDR(t *testing.T) {
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -100,7 +100,7 @@ func TestOnlyFromAllowedCIDR(t *testing.T) {
 }
 
 func TestOnlyFromRejected(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
 	})
@@ -130,7 +130,7 @@ func TestOnlyFromErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				r.RemoteAddr = tt.remoteAddr
-				OnlyFrom("1.1.1.1")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				OnlyFrom("1.1.1.1")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					_, err := w.Write([]byte("blah blah"))
 					require.NoError(t, err)
 				})).ServeHTTP(w, r)
