@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -15,7 +16,6 @@ import (
 )
 
 func TestRest_RenderJSON(t *testing.T) {
-
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		j := JSON{"key1": 1, "key2": "222"}
 		RenderJSON(w, j)
@@ -35,7 +35,6 @@ func TestRest_RenderJSON(t *testing.T) {
 }
 
 func TestRest_RenderJSONFromBytes(t *testing.T) {
-
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.NoError(t, RenderJSONFromBytes(w, r, []byte("some data")))
 	}))
@@ -53,7 +52,6 @@ func TestRest_RenderJSONFromBytes(t *testing.T) {
 }
 
 func TestRest_RenderJSONWithHTML(t *testing.T) {
-
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		j := JSON{"key1": "val1", "key2": 2.0, "html": `<div> blah </div>`}
 		require.NoError(t, RenderJSONWithHTML(w, r, j))
@@ -77,7 +75,6 @@ func TestRest_RenderJSONWithHTML(t *testing.T) {
 }
 
 func TestParseFromTo(t *testing.T) {
-
 	tbl := []struct {
 		query    string
 		from, to time.Time
@@ -121,6 +118,49 @@ func TestParseFromTo(t *testing.T) {
 		})
 	}
 
+}
+
+func TestDecodeJSONRequest(t *testing.T) {
+	type record struct {
+		Field1 string `json:"field1"`
+		Field2 int    `json:"field2"`
+	}
+
+	inp := `{"field1":"value1","field2":2}`
+	req := httptest.NewRequest(http.MethodPost, "/test", bytes.NewBufferString(inp))
+	req.Header.Set("Content-Type", "application/json")
+
+	var obj record
+	err := DecodeJSON(req, &obj)
+	require.NoError(t, err)
+	assert.Equal(t, "value1", obj.Field1)
+	assert.Equal(t, 2, obj.Field2)
+}
+
+func TestEncodeJSONResponse(t *testing.T) {
+	type record struct {
+		Field1 string `json:"field1"`
+		Field2 int    `json:"field2"`
+	}
+
+	obj := record{Field1: "value1", Field2: 2}
+	w := httptest.NewRecorder()
+	if err := EncodeJSON(w, http.StatusOK, obj); err != nil {
+		t.Errorf("Failed to encode JSON response: %v", err)
+	}
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+
+	var decodedObj record
+	err := json.NewDecoder(resp.Body).Decode(&decodedObj)
+	require.NoError(t, err)
+
+	assert.Equal(t, obj.Field1, decodedObj.Field1)
+	assert.Equal(t, obj.Field2, decodedObj.Field2)
 }
 
 func getTestHandlerBlah() http.HandlerFunc {
