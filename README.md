@@ -130,8 +130,7 @@ and added to the request's context.
 
 ### Deprecation middleware
 
-Adds the HTTP Deprecation response header, see [draft-dalal-deprecation-header-00](https://tools.ietf.org/id/draft-dalal-deprecation-header-00.html
-) 
+Adds the HTTP Deprecation response header, see [draft-ietf-httpapi-deprecation-header-02](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-deprecation-header-02) 
 
 ### BasicAuth middleware
 
