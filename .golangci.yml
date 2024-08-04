@@ -1,12 +1,9 @@
 linters-settings:
   govet:
-    check-shadowing: true
-  golint:
-    min-confidence: 0
+    enable:
+      - shadow
   gocyclo:
     min-complexity: 15
-  maligned:
-    suggest-new: true
   dupl:
     threshold: 100
   goconst:
@@ -26,17 +23,17 @@ linters-settings:
 
 linters:
   enable:
-    - megacheck
+    - staticcheck
+    - gosimple
     - revive
     - govet
     - unconvert
-    - megacheck
-    - gas
+    - unused
+    - gosec
     - gocyclo
     - dupl
     - misspell
     - unparam
-    - unused
     - typecheck
     - ineffassign
     - stylecheck
@@ -44,25 +41,15 @@ linters:
     - exportloopref
     - gocritic
     - nakedret
-    - gosimple
     - prealloc
   fast: false
   disable-all: true
-
-run:
-  output:
-    format: tab
-  skip-dirs:
-    - vendor
 
 issues:
   exclude-rules:
     - text: 'Deferring unsafe method "Close" on type "io.ReadCloser"'
       linters:
         - gosec
-    - text: "should have a package comment, unless it's in another file for this package"
-      linters:
-        - golint
     - path: _test\.go
       linters:
         - dupl
