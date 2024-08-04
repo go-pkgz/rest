@@ -55,10 +55,10 @@ func NewBenchmarks() *Benchmarks {
 // Default is 15 minutes. The increase of this range will change memory utilization as each second of the range
 // kept as benchData aggregate. The default means 15*60 = 900 seconds of data aggregate.
 // Larger range allows for longer time periods to be benchmarked.
-func (b *Benchmarks) WithTimeRange(max time.Duration) *Benchmarks {
+func (b *Benchmarks) WithTimeRange(maximum time.Duration) *Benchmarks {
 	b.lock.Lock()
 	defer b.lock.Unlock()
-	b.maxTimeRange = max
+	b.maxTimeRange = maximum
 	return b
 }
 
