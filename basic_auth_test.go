@@ -53,7 +53,7 @@ func TestBasicAuth(t *testing.T) {
 		req.SetBasicAuth("dev", "bad")
 		resp, err := client.Do(req)
 		require.NoError(t, err)
-		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	}
 }
 
@@ -95,7 +95,7 @@ func TestBasicAuthWithUserPasswd(t *testing.T) {
 		req.SetBasicAuth("dev", "bad")
 		resp, err := client.Do(req)
 		require.NoError(t, err)
-		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	}
 }
 

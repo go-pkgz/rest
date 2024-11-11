@@ -20,7 +20,7 @@ func BasicAuth(checker func(user, passwd string) bool) func(http.Handler) http.H
 				return
 			}
 			if !checker(u, p) {
-				w.WriteHeader(http.StatusForbidden)
+				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
 			h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), contextKey(baContextKey), true)))
