@@ -3,6 +3,7 @@ package rest
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -168,4 +169,149 @@ func TestBenchmarks_Handler(t *testing.T) {
 		assert.InDelta(t, 50000, res.MaxRespTime, 10000)
 		assert.True(t, res.MaxRespTime >= res.MinRespTime)
 	}
+}
+
+func TestBenchmark_ConcurrentAccess(t *testing.T) {
+	bench := NewBenchmarks()
+	var wg sync.WaitGroup
+
+	// simulate concurrent updates
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			bench.update(time.Duration(i) * time.Millisecond)
+		}(i)
+	}
+
+	// simulate concurrent stats reads while updating
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			stats := bench.Stats(time.Minute)
+			require.GreaterOrEqual(t, stats.Requests, 0)
+		}()
+	}
+
+	wg.Wait()
+
+	stats := bench.Stats(time.Minute)
+	assert.Equal(t, 100, stats.Requests)
+}
+
+func TestBenchmark_EdgeCases(t *testing.T) {
+	bench := NewBenchmarks()
+
+	t.Run("zero duration", func(t *testing.T) {
+		bench.update(0)
+		stats := bench.Stats(time.Minute)
+		assert.Equal(t, int64(0), stats.MinRespTime)
+		assert.Equal(t, int64(0), stats.MaxRespTime)
+	})
+
+	t.Run("very large duration", func(t *testing.T) {
+		bench.update(time.Hour)
+		stats := bench.Stats(time.Minute)
+		assert.Equal(t, time.Hour.Microseconds(), stats.MaxRespTime)
+	})
+
+	t.Run("negative stats interval", func(t *testing.T) {
+		stats := bench.Stats(-time.Minute)
+		assert.Equal(t, BenchmarkStats{}, stats)
+	})
+}
+
+func TestBenchmark_TimeWindowBoundaries(t *testing.T) {
+	bench := NewBenchmarks()
+	now := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	bench.nowFn = func() time.Time { return now }
+
+	// add data points exactly at minute boundaries
+	for i := 0; i < 120; i++ {
+		bench.nowFn = func() time.Time {
+			return now.Add(time.Duration(i) * time.Second)
+		}
+		bench.update(time.Millisecond * 50)
+	}
+
+	tests := []struct {
+		name     string
+		interval time.Duration
+		want     int // expected number of requests
+	}{
+		{"exact minute", time.Minute, 60},
+		{"30 seconds", time.Second * 30, 30},
+		{"90 seconds", time.Second * 90, 90},
+		{"2 minutes", time.Minute * 2, 120},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stats := bench.Stats(tt.interval)
+			assert.Equal(t, tt.want, stats.Requests, "interval %v should have %d requests", tt.interval, tt.want)
+		})
+	}
+}
+
+func TestBenchmark_CustomTimeRange(t *testing.T) {
+	tests := []struct {
+		name       string
+		timeRange  time.Duration
+		dataPoints int
+		wantKept   int
+	}{
+		{"1 minute range", time.Minute, 120, 60},
+		{"5 minute range", time.Minute * 5, 400, 300},
+		{"custom 45s range", time.Second * 45, 100, 45},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bench := NewBenchmarks().WithTimeRange(tt.timeRange)
+			now := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
+
+			// Add data points
+			for i := 0; i < tt.dataPoints; i++ {
+				bench.nowFn = func() time.Time {
+					return now.Add(time.Duration(i) * time.Second)
+				}
+				bench.update(time.Millisecond * 50)
+			}
+
+			assert.Equal(t, tt.wantKept, bench.data.Len(),
+				"should keep only %d data points for %v time range",
+				tt.wantKept, tt.timeRange)
+		})
+	}
+}
+
+func TestBenchmark_VariableLoad(t *testing.T) {
+	bench := NewBenchmarks()
+	now := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	// simulate variable load pattern
+	patterns := []struct {
+		count    int
+		duration time.Duration
+	}{
+		{10, time.Millisecond * 10},  // fast responses
+		{5, time.Millisecond * 100},  // medium responses
+		{2, time.Millisecond * 1000}, // slow responses
+	}
+
+	for i, p := range patterns {
+		bench.nowFn = func() time.Time {
+			return now.Add(time.Duration(i) * time.Second)
+		}
+		for j := 0; j < p.count; j++ {
+			bench.update(p.duration)
+		}
+	}
+
+	stats := bench.Stats(time.Minute)
+	assert.Equal(t, 17, stats.Requests)                  // total requests across all patterns
+	assert.Equal(t, int64(1000*1000), stats.MaxRespTime) // should be the max (1000ms = 1_000_000 microseconds)
+	assert.Equal(t, int64(10*1000), stats.MinRespTime)   // should be the min (10ms = 10_000 microseconds)
 }
