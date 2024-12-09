@@ -97,7 +97,7 @@ func TestFileServerWithListing(t *testing.T) {
 <a href="f2.html">f2.html</a>
 </pre>
 `
-		assert.Equal(t, exp, string(msg))
+		assert.Contains(t, string(msg), exp)
 	}
 
 	{

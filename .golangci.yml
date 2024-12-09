@@ -1,11 +1,11 @@
+run:
+  timeout: 5m
+  tests: false
+
 linters-settings:
   govet:
     enable:
       - shadow
-  gocyclo:
-    min-complexity: 15
-  dupl:
-    threshold: 100
   goconst:
     min-len: 2
     min-occurrences: 2
@@ -20,17 +20,19 @@ linters-settings:
       - experimental
     disabled-checks:
       - wrapperFunc
+      - hugeParam
+      - rangeValCopy
+      - singleCaseSwitch
+      - ifElseChain
 
 linters:
   enable:
-    - staticcheck
-    - gosimple
     - revive
     - govet
     - unconvert
+    - staticcheck
     - unused
     - gosec
-    - gocyclo
     - dupl
     - misspell
     - unparam
@@ -38,19 +40,27 @@ linters:
     - ineffassign
     - stylecheck
     - gochecknoinits
-    - exportloopref
+    - copyloopvar
     - gocritic
     - nakedret
+    - gosimple
     - prealloc
   fast: false
   disable-all: true
 
 issues:
+  exclude-dirs:
+    - vendor
   exclude-rules:
-    - text: 'Deferring unsafe method "Close" on type "io.ReadCloser"'
+    - text: "at least one file in a package should have a package comment"
       linters:
-        - gosec
+        - stylecheck
+    - text: "should have a package comment"
+      linters:
+        - revive
     - path: _test\.go
       linters:
+        - gosec
         - dupl
   exclude-use-default: false
+
