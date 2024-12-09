@@ -113,6 +113,33 @@ func BasicAuthWithPrompt(user, passwd string) func(http.Handler) http.Handler {
 	}
 }
 
+// BasicAuthWithBcryptHashAndPrompt middleware requires basic auth and matches user & bcrypt hashed password
+// If the user is not authorized, it will prompt for basic auth
+func BasicAuthWithBcryptHashAndPrompt(user, hashedPassword string) func(http.Handler) http.Handler {
+	checkFn := func(reqUser, reqPasswd string) bool {
+		if reqUser != user {
+			return false
+		}
+		err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(reqPasswd))
+		return err == nil
+	}
+
+	return func(h http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			// extract basic auth from request
+			u, p, ok := r.BasicAuth()
+			if ok && checkFn(u, p) {
+				h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), contextKey(baContextKey), true)))
+				return
+			}
+			// not authorized, prompt for basic auth
+			w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		}
+		return http.HandlerFunc(fn)
+	}
+}
+
 // GenerateBcryptHash generates a bcrypt hash from a password
 func GenerateBcryptHash(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

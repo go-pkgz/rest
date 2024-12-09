@@ -360,3 +360,87 @@ func TestArgon2InvalidInputs(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 	})
 }
+
+func TestBasicAuthWithBcryptHashAndPrompt(t *testing.T) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("good"), bcrypt.MinCost)
+	require.NoError(t, err)
+	t.Logf("hashed password: %s", string(hashedPassword))
+
+	mw := BasicAuthWithBcryptHashAndPrompt("dev", string(hashedPassword))
+
+	ts := httptest.NewServer(mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("request %s", r.URL)
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte("blah"))
+		require.NoError(t, err)
+		assert.True(t, IsAuthorized(r.Context()))
+	})))
+	defer ts.Close()
+
+	u := fmt.Sprintf("%s%s", ts.URL, "/something")
+	client := http.Client{Timeout: 5 * time.Second}
+
+	tests := []struct {
+		name           string
+		username       string
+		password       string
+		expectedStatus int
+		checkPrompt    bool
+	}{
+		{
+			name:           "no auth provided",
+			username:       "",
+			password:       "",
+			expectedStatus: http.StatusUnauthorized,
+			checkPrompt:    true,
+		},
+		{
+			name:           "correct credentials",
+			username:       "dev",
+			password:       "good",
+			expectedStatus: http.StatusOK,
+			checkPrompt:    false,
+		},
+		{
+			name:           "wrong username",
+			username:       "wrong",
+			password:       "good",
+			expectedStatus: http.StatusUnauthorized,
+			checkPrompt:    true,
+		},
+		{
+			name:           "wrong password",
+			username:       "dev",
+			password:       "bad",
+			expectedStatus: http.StatusUnauthorized,
+			checkPrompt:    true,
+		},
+		{
+			name:           "empty password",
+			username:       "dev",
+			password:       "",
+			expectedStatus: http.StatusUnauthorized,
+			checkPrompt:    true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", u, http.NoBody)
+			require.NoError(t, err)
+
+			if tc.username != "" || tc.password != "" {
+				req.SetBasicAuth(tc.username, tc.password)
+			}
+
+			resp, err := client.Do(req)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
+
+			if tc.checkPrompt {
+				assert.Equal(t, `Basic realm="restricted", charset="UTF-8"`, resp.Header.Get("WWW-Authenticate"),
+					"should include WWW-Authenticate header")
+			}
+		})
+	}
+}
