@@ -123,7 +123,7 @@ func GenerateBcryptHash(password string) (string, error) {
 }
 
 // GenerateArgon2Hash generates an argon2 hash and salt from a password
-func GenerateArgon2Hash(password string) (hash string, salt string, err error) {
+func GenerateArgon2Hash(password string) (hash, salt string, err error) {
 	saltBytes := make([]byte, 16)
 	if _, err := rand.Read(saltBytes); err != nil {
 		return "", "", err
