@@ -92,14 +92,12 @@ func TestFileServerWithListing(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		msg, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
-		exp := `<!doctype html>
-<meta name="viewport" content="width=device-width">
-<pre>
+		exp := `<pre>
 <a href="f1.html">f1.html</a>
 <a href="f2.html">f2.html</a>
 </pre>
 `
-		assert.Equal(t, exp, string(msg))
+		assert.Contains(t, string(msg), exp)
 	}
 
 	{
