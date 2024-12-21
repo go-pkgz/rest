@@ -1,6 +1,6 @@
 module github.com/go-pkgz/rest
 
-go 1.23
+go 1.21
 
 require (
 	github.com/stretchr/testify v1.10.0
