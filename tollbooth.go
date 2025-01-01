@@ -30,7 +30,7 @@ func LimitHandler(lmt *limiter.Limiter) func(http.Handler) http.Handler {
 					lmt.ExecOnLimitReached(w, r)
 					w.Header().Add("Content-Type", lmt.GetMessageContentType())
 					w.WriteHeader(httpError.StatusCode)
-					w.Write([]byte(httpError.Message))
+					w.Write([]byte(httpError.Message)) //nolint:gosec // not much we can do here with failed write
 					return
 				}
 				next.ServeHTTP(w, r)

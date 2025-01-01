@@ -31,9 +31,9 @@ jobs:
           TZ: "America/Chicago"
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v4
         with:
-          version: v1.59
+          version: v1.63
 
       - name: install goveralls
         run: |
