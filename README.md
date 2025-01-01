@@ -181,6 +181,34 @@ example with chi router:
 	
 	router.Use(rest.Reject(http.StatusBadRequest, "X-Request-Id header is required", rejectFn))
 ```
+### Limiter (tollbooth) middleware
+
+Limiter middleware is a rate limiter that limits the number of requests a client can make in a given time window. 
+It wraps the [tollbooth](https://github.com/didip/tollbooth) library.
+
+example with stdlib router:
+
+```go
+    router := http.NewServeMux()
+    limiter := tollbooth.NewLimiter(1, nil)
+    
+    router.Handle("/api", tollbooth.LimitHandler(limiter, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Write([]byte("Hello, World!"))
+    })))
+``` 
+
+example with [routegroup](https://github.com/go-pkgz/routegroup):
+
+```go
+    router := routegroup.New(http.NewServeMux())
+    limiter := tollbooth.NewLimiter(1, nil)
+	router.Use(rest.Limiter(limiter))
+	
+    router.HandleFunc("/api", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Write([]byte("Hello, World!"))
+    }))
+```
+By default, the middleware uses `RemoteAddr` lookup to get the client's IP address. This can be changed by `SetIPLookup` of the limiter itself. For more details see [tollbooth docs](https://github.com/didip/tollbooth?tab=readme-ov-file#features)
 
 ### BasicAuth middleware family
 
