@@ -143,3 +143,71 @@ func TestGetFromRemoteAddr(t *testing.T) {
 	_, err = client.Do(req)
 	require.NoError(t, err)
 }
+
+func TestGetWithVariousIPFormats(t *testing.T) {
+	tests := []struct {
+		name       string
+		remoteAddr string
+		headers    map[string]string
+		wantIP     string
+		wantErr    bool
+	}{
+		{
+			name:       "IPv4 with port",
+			remoteAddr: "192.168.1.1:8080",
+			wantIP:     "192.168.1.1",
+			wantErr:    false,
+		},
+		{
+			name:       "IPv4 without port",
+			remoteAddr: "127.0.0.1",
+			wantIP:     "127.0.0.1",
+			wantErr:    false,
+		},
+		{
+			name:       "IPv6 with port",
+			remoteAddr: "[::1]:8080",
+			wantIP:     "::1",
+			wantErr:    false,
+		},
+		{
+			name:       "IPv6 without port",
+			remoteAddr: "::1",
+			wantIP:     "::1",
+			wantErr:    false,
+		},
+		{
+			name:       "X-Forwarded-For",
+			remoteAddr: "127.0.0.1:8080",
+			headers:    map[string]string{"X-Forwarded-For": "203.0.113.1"},
+			wantIP:     "203.0.113.1",
+			wantErr:    false,
+		},
+		{
+			name:       "Invalid IP",
+			remoteAddr: "invalid-ip",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", "/", nil)
+			require.NoError(t, err)
+
+			req.RemoteAddr = tt.remoteAddr
+			for k, v := range tt.headers {
+				req.Header.Set(k, v)
+			}
+
+			gotIP, err := Get(req)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantIP, gotIP)
+		})
+	}
+}
