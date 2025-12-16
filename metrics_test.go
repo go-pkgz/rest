@@ -43,3 +43,18 @@ func TestMetricsRejected(t *testing.T) {
 	defer resp.Body.Close()
 	assert.Equal(t, 403, resp.StatusCode)
 }
+
+func TestMetricsContentType(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+	ts := httptest.NewServer(Metrics("1.1.1.1")(handler))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/metrics")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+}

@@ -271,6 +271,41 @@ func TestHealthFailed(t *testing.T) {
 	assert.Equal(t, `[{"name":"check1","status":"ok"},{"name":"check2","status":"failed","error":"some error"}]`+"\n", string(b))
 }
 
+func TestHealthContentType(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte("blah blah"))
+		require.NoError(t, err)
+	})
+
+	t.Run("healthy returns json content-type", func(t *testing.T) {
+		check := func(context.Context) (string, error) {
+			return "check1", nil
+		}
+		ts := httptest.NewServer(Health("/health", check)(handler))
+		defer ts.Close()
+
+		resp, err := http.Get(ts.URL + "/health")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+	})
+
+	t.Run("unhealthy returns json content-type", func(t *testing.T) {
+		check := func(context.Context) (string, error) {
+			return "check1", errors.New("some error")
+		}
+		ts := httptest.NewServer(Health("/health", check)(handler))
+		defer ts.Close()
+
+		resp, err := http.Get(ts.URL + "/health")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+		assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+	})
+}
+
 func TestReject(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
