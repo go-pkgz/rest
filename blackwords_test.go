@@ -82,3 +82,19 @@ func TestBlackwordsFn(t *testing.T) {
 		})
 	}
 }
+
+func TestBlackwordsContentType(t *testing.T) {
+	bwMiddleware := BlackWords("bad1", "bad2")
+	ts := httptest.NewServer(bwMiddleware(getTestHandlerBlah()))
+	defer ts.Close()
+
+	client := http.Client{Timeout: 5 * time.Second}
+	req, err := http.NewRequest("GET", ts.URL+"/something", bytes.NewBuffer([]byte("contains bad1 word")))
+	assert.NoError(t, err)
+
+	resp, err := client.Do(req)
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+}
