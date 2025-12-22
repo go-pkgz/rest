@@ -272,7 +272,7 @@ func TestBenchmark_CustomTimeRange(t *testing.T) {
 			bench := NewBenchmarks().WithTimeRange(tt.timeRange)
 			now := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
 
-			// Add data points
+			// add data points
 			for i := 0; i < tt.dataPoints; i++ {
 				bench.nowFn = func() time.Time {
 					return now.Add(time.Duration(i) * time.Second)
