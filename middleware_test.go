@@ -46,7 +46,6 @@ func TestMiddleware_AppInfo(t *testing.T) {
 }
 
 func TestMiddleware_Ping(t *testing.T) {
-
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
 		require.NoError(t, err)
@@ -54,21 +53,51 @@ func TestMiddleware_Ping(t *testing.T) {
 	ts := httptest.NewServer(Ping(handler))
 	defer ts.Close()
 
-	resp, err := http.Get(ts.URL + "/ping")
-	require.Nil(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-	defer resp.Body.Close()
-	b, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	assert.Equal(t, "pong", string(b))
+	t.Run("GET returns pong", func(t *testing.T) {
+		resp, err := http.Get(ts.URL + "/ping")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, "text/plain", resp.Header.Get("Content-Type"))
+		b, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "pong", string(b))
+	})
 
-	resp, err = http.Get(ts.URL + "/blah")
-	require.Nil(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-	defer resp.Body.Close()
-	b, err = io.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	assert.Equal(t, "blah blah", string(b))
+	t.Run("HEAD returns 200 with no body", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodHead, ts.URL+"/ping", http.NoBody)
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, "text/plain", resp.Header.Get("Content-Type"))
+		b, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Empty(t, b, "HEAD should return empty body")
+	})
+
+	t.Run("POST passes to next handler", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodPost, ts.URL+"/ping", http.NoBody)
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		b, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "blah blah", string(b))
+	})
+
+	t.Run("other paths pass to next handler", func(t *testing.T) {
+		resp, err := http.Get(ts.URL + "/blah")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		b, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "blah blah", string(b))
+	})
 }
 
 func TestMiddleware_Recoverer(t *testing.T) {
