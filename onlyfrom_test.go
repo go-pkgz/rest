@@ -183,3 +183,23 @@ func TestOnlyFromContentType(t *testing.T) {
 		assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
 	})
 }
+
+func TestOnlyFrom_EmptyList(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte("allowed"))
+		require.NoError(t, err)
+	})
+
+	// empty list should allow all traffic
+	ts := httptest.NewServer(OnlyFrom()(handler))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/blah")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "allowed", string(b))
+}

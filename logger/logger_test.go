@@ -423,3 +423,91 @@ func TestAnonymizeIP(t *testing.T) {
 		})
 	}
 }
+
+func TestLogger_WriteHeader(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, err := w.Write([]byte("created"))
+		require.NoError(t, err)
+	})
+
+	lb := &mockLgr{}
+	l := New(Prefix("[INFO]"), Log(lb))
+
+	ts := httptest.NewServer(l.Handler(handler))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/test")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	s := lb.buf.String()
+	assert.Contains(t, s, "201")
+}
+
+func TestLogger_Flush(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte("streaming"))
+		require.NoError(t, err)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		_, err = w.Write([]byte(" data"))
+		require.NoError(t, err)
+	})
+
+	lb := &mockLgr{}
+	l := New(Prefix("[INFO]"), Log(lb))
+
+	ts := httptest.NewServer(l.Handler(handler))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/test")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "streaming data", string(body))
+}
+
+func TestLogger_Hijack(t *testing.T) {
+	// hijack requires a real TCP connection, not httptest.ResponseRecorder
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			http.Error(w, "hijack not supported", http.StatusInternalServerError)
+			return
+		}
+		conn, _, err := hj.Hijack()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer conn.Close()
+		_, _ = conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\nhijacked"))
+	})
+
+	lb := &mockLgr{}
+	l := New(Prefix("[INFO]"), Log(lb))
+
+	ts := httptest.NewServer(l.Handler(handler))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/test")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "hijacked", string(body))
+}
+
+func TestLogger_HijackNotSupported(t *testing.T) {
+	// test that hijack returns error when underlying writer doesn't support it
+	crw := newCustomResponseWriter(httptest.NewRecorder())
+	_, _, err := crw.Hijack()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "does not implement the Hijacker interface")
+}

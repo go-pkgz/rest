@@ -163,6 +163,54 @@ func TestEncodeJSONResponse(t *testing.T) {
 	assert.Equal(t, obj.Field2, decodedObj.Field2)
 }
 
+func TestRest_RenderJSON_EncodingError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// channels cannot be encoded to JSON
+		RenderJSON(w, make(chan int))
+	}))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/test")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+}
+
+func TestRest_RenderJSONWithHTML_EncodingError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// channels cannot be encoded to JSON
+		err := RenderJSONWithHTML(w, r, make(chan int))
+		assert.Error(t, err)
+	}))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/test")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestDecodeJSON_MalformedJSON(t *testing.T) {
+	type record struct {
+		Field1 string `json:"field1"`
+	}
+
+	inp := `{"field1": invalid}`
+	req := httptest.NewRequest(http.MethodPost, "/test", bytes.NewBufferString(inp))
+	req.Header.Set("Content-Type", "application/json")
+
+	var obj record
+	err := DecodeJSON(req, &obj)
+	assert.Error(t, err)
+}
+
+func TestEncodeJSON_EncodingError(t *testing.T) {
+	w := httptest.NewRecorder()
+	// channels cannot be encoded to JSON
+	err := EncodeJSON(w, http.StatusOK, make(chan int))
+	assert.Error(t, err)
+}
+
 func getTestHandlerBlah() http.HandlerFunc {
 	fn := func(rw http.ResponseWriter, _ *http.Request) {
 		_, _ = rw.Write([]byte("blah"))

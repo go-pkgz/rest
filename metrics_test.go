@@ -58,3 +58,41 @@ func TestMetricsContentType(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
 }
+
+func TestMetrics_NonGetRequest(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte("handler response"))
+		require.NoError(t, err)
+	})
+	ts := httptest.NewServer(Metrics("127.0.0.1")(handler))
+	defer ts.Close()
+
+	// POST to /metrics should pass to handler
+	resp, err := http.Post(ts.URL+"/metrics", "text/plain", strings.NewReader("data"))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "handler response", string(b))
+}
+
+func TestMetrics_NonMetricsPath(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte("other path"))
+		require.NoError(t, err)
+	})
+	ts := httptest.NewServer(Metrics("127.0.0.1")(handler))
+	defer ts.Close()
+
+	// GET to other path should pass to handler
+	resp, err := http.Get(ts.URL + "/other")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "other path", string(b))
+}

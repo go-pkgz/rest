@@ -64,6 +64,40 @@ func TestGzipCustom(t *testing.T) {
 
 }
 
+func TestGzipWriteHeader(t *testing.T) {
+	// test that explicit WriteHeader call works with gzip middleware
+	longText := strings.Repeat("This is a test message for gzip compression. ", 20)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, err := w.Write([]byte(longText))
+		require.NoError(t, err)
+	})
+	ts := httptest.NewServer(Gzip()(handler))
+	defer ts.Close()
+
+	client := http.Client{}
+	req, err := http.NewRequest("GET", ts.URL+"/something", http.NoBody)
+	require.NoError(t, err)
+	req.Header.Set("Accept-Encoding", "gzip")
+	req.Header.Set("Content-Type", "text/plain")
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	assert.Equal(t, "gzip", resp.Header.Get("Content-Encoding"))
+
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	// verify it's compressed (smaller than original)
+	assert.Less(t, len(b), len(longText), "response should be compressed")
+
+	gzr, err := gzip.NewReader(bytes.NewBuffer(b))
+	require.NoError(t, err)
+	decompressed, err := io.ReadAll(gzr)
+	require.NoError(t, err)
+	assert.Equal(t, longText, string(decompressed))
+}
+
 func TestGzipDefault(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("Lorem Ipsum is simply dummy text of the printing and typesetting industry. " +

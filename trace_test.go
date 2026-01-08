@@ -64,3 +64,11 @@ func TestTraceWithID(t *testing.T) {
 	t.Logf("headers - %+v", res.Header)
 	assert.Equal(t, "123456", traceHeader, "passing original trace-id")
 }
+
+func TestGetTraceID_NoContext(t *testing.T) {
+	// test GetTraceID when called without Trace middleware (no trace ID in context)
+	req, err := http.NewRequest("GET", "/test", http.NoBody)
+	assert.NoError(t, err)
+	traceID := GetTraceID(req)
+	assert.Empty(t, traceID, "trace ID should be empty without Trace middleware")
+}
