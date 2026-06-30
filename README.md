@@ -213,6 +213,7 @@ Features:
 - Origin validation with case-insensitive matching
 - Credentials support (reflects origin instead of `*`)
 - Configurable cache duration for preflight results
+- Cache-correct `Vary` headers (adds `Access-Control-Request-Method` and `Access-Control-Request-Headers` on preflight)
 
 Available options:
 - `CorsAllowedOrigins(origins...)` - allowed origins (default: `*`)

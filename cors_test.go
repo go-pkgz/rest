@@ -226,6 +226,59 @@ func TestCORS_VaryHeader(t *testing.T) {
 	assert.Contains(t, resp.Header.Get("Vary"), "Origin")
 }
 
+func TestCORS_PreflightVaryHeaders(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("preflight varies on origin, method and headers", func(t *testing.T) {
+		req := httptest.NewRequest("OPTIONS", "/test", http.NoBody)
+		req.Header.Set("Origin", "https://example.com")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		w := httptest.NewRecorder()
+
+		CORS()(handler).ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		vary := resp.Header.Values("Vary")
+		assert.Contains(t, vary, "Origin")
+		assert.Contains(t, vary, "Access-Control-Request-Method")
+		assert.Contains(t, vary, "Access-Control-Request-Headers")
+	})
+
+	t.Run("simple request does not vary on preflight headers", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
+		req.Header.Set("Origin", "https://example.com")
+		w := httptest.NewRecorder()
+
+		CORS()(handler).ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		vary := resp.Header.Values("Vary")
+		assert.Contains(t, vary, "Origin")
+		assert.NotContains(t, vary, "Access-Control-Request-Method")
+		assert.NotContains(t, vary, "Access-Control-Request-Headers")
+	})
+
+	t.Run("non-preflight OPTIONS does not vary on preflight headers", func(t *testing.T) {
+		// OPTIONS without Access-Control-Request-Method is not a preflight
+		req := httptest.NewRequest("OPTIONS", "/test", http.NoBody)
+		req.Header.Set("Origin", "https://example.com")
+		w := httptest.NewRecorder()
+
+		CORS()(handler).ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		vary := resp.Header.Values("Vary")
+		assert.Contains(t, vary, "Origin")
+		assert.NotContains(t, vary, "Access-Control-Request-Method")
+		assert.NotContains(t, vary, "Access-Control-Request-Headers")
+	})
+}
+
 func TestCORS_OptionsWithoutPreflight(t *testing.T) {
 	handlerCalled := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
