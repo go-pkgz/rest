@@ -298,6 +298,18 @@ func TestGetBody(t *testing.T) {
 	l = New(WithBody)
 	body = l.getBody(req)
 	assert.Equal(t, "body", body)
+
+	// nil transform reproduces the default path, including the truncation marker
+	reqTrunc, err := http.NewRequest("POST", "http://example.com/", strings.NewReader("0123456789abc"))
+	require.NoError(t, err)
+	l = New(WithBody, MaxBodySize(5), BodyFn(nil))
+	assert.Equal(t, "01234...", l.getBody(reqTrunc))
+
+	// a lone carriage return in the raw body is collapsed to a space (single-line guarantee)
+	reqCR, err := http.NewRequest("POST", "http://example.com/", strings.NewReader("a\rb"))
+	require.NoError(t, err)
+	l = New(WithBody)
+	assert.Equal(t, "a b", l.getBody(reqCR))
 }
 
 func TestGetBodyBodyFn(t *testing.T) {
@@ -320,6 +332,8 @@ func TestGetBodyBodyFn(t *testing.T) {
 		{"plain text, not json", "just text, no braces", 1024, "JUST TEXT, NO BRACES"},
 		{"empty body", "", 1024, ""},
 		{"collapses transform newlines", "a\nb", 1024, "A B"},
+		{"collapses lone carriage return", "a\rb", 1024, "A B"},
+		{"collapses unicode line separator", "a\u2028b", 1024, "A B"},
 		{"truncated flag set", "0123456789abc", 5, "<truncated:01234>"},
 	}
 
@@ -381,6 +395,29 @@ func TestLoggerBodyFn(t *testing.T) {
 	t.Log(s)
 	assert.Contains(t, s, `{"user":"alice","password":"****"}`)
 	assert.NotContains(t, s, "secret")
+}
+
+func TestLoggerBodyWithPercent(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte("ok"))
+		require.NoError(t, err)
+	})
+
+	lb := &mockLgr{}
+	l := New(Prefix("[INFO] REST"), WithBody, Log(lb))
+	ts := httptest.NewServer(l.Handler(handler))
+	defer ts.Close()
+
+	// a body with a percent verb must be logged verbatim, not treated as a format directive
+	resp, err := http.Post(ts.URL+"/blah", "", bytes.NewBufferString("a%sb 100%done"))
+	require.NoError(t, err)
+	defer resp.Body.Close() // nolint
+	assert.Equal(t, 200, resp.StatusCode)
+
+	s := lb.buf.String()
+	t.Log(s)
+	assert.Contains(t, s, "a%sb 100%done")
+	assert.NotContains(t, s, "MISSING")
 }
 
 func TestPeek(t *testing.T) {

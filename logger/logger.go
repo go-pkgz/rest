@@ -132,7 +132,7 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 				body:       body,
 			}
 
-			l.log.Logf(formater(r, p))
+			l.log.Logf("%s", formater(r, p))
 		}()
 
 		next.ServeHTTP(ww, r)
@@ -209,6 +209,19 @@ func (l *Middleware) formatApacheCombined(r *http.Request, p *logParts) string {
 
 var reMultWhtsp = regexp.MustCompile(`[\s\p{Zs}]{2,}`)
 
+// lineBreaks maps every character that can start a new line to a space, so a body
+// can't forge extra log records. reMultWhtsp only collapses runs of two or more, so
+// a lone CR or a Unicode line separator would otherwise slip through.
+var lineBreaks = strings.NewReplacer(
+	"\n", " ", // LF
+	"\r", " ", // CR
+	"\v", " ", // vertical tab
+	"\f", " ", // form feed
+	"\u0085", " ", // NEL
+	"\u2028", " ", // line separator
+	"\u2029", " ", // paragraph separator
+)
+
 func (l *Middleware) getBody(r *http.Request) string {
 	if !l.logBody {
 		return ""
@@ -240,9 +253,9 @@ func (l *Middleware) getBody(r *http.Request) string {
 	}
 
 	// always collapse to a single line, regardless of the transform, so an
-	// embedded newline in the body can't forge additional log lines.
+	// embedded line break in the body can't forge additional log lines.
 	if body != "" {
-		body = strings.ReplaceAll(body, "\n", " ")
+		body = lineBreaks.Replace(body)
 		body = reMultWhtsp.ReplaceAllString(body, " ")
 	}
 
