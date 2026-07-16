@@ -26,6 +26,7 @@ type Middleware struct {
 	ipFn           func(ip string) string
 	userFn         func(r *http.Request) (string, error)
 	subjFn         func(r *http.Request) (string, error)
+	bodyFn         func(body string, truncated bool) string
 	log            Backend
 	apacheCombined bool
 }
@@ -226,13 +227,23 @@ func (l *Middleware) getBody(r *http.Request) string {
 	// https://golang.org/pkg/net/http/#Handler
 	r.Body = io.NopCloser(reader)
 
+	// the transform owns the logged body: it receives the body (capped at
+	// maxBodySize) and a flag telling it whether more was dropped, and decides
+	// how to render it - mask values, summarize, or emit a marker for a
+	// truncated body. without a transform the body is logged as read, with the
+	// "..." marker appended when it was truncated.
+	switch {
+	case l.bodyFn != nil:
+		body = l.bodyFn(body, hasMore)
+	case hasMore:
+		body += "..."
+	}
+
+	// always collapse to a single line, regardless of the transform, so an
+	// embedded newline in the body can't forge additional log lines.
 	if body != "" {
 		body = strings.ReplaceAll(body, "\n", " ")
 		body = reMultWhtsp.ReplaceAllString(body, " ")
-	}
-
-	if hasMore {
-		body += "..."
 	}
 
 	return body
