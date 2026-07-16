@@ -192,7 +192,7 @@ func (l *Middleware) formatApacheCombined(r *http.Request, p *logParts) string {
 	bld.WriteString(p.method)
 	bld.WriteString(" ")
 	bld.WriteString(p.rawURL)
-	bld.WriteString(`" `)
+	bld.WriteString(" ")
 	bld.WriteString(r.Proto)
 	bld.WriteString(`" `)
 	bld.WriteString(strconv.Itoa(p.statusCode))
@@ -243,10 +243,11 @@ func (l *Middleware) getBody(r *http.Request) string {
 	// the transform owns the logged body: it receives the body (capped at
 	// maxBodySize) and a flag telling it whether more was dropped, and decides
 	// how to render it - mask values, summarize, or emit a marker for a
-	// truncated body. without a transform the body is logged as read, with the
-	// "..." marker appended when it was truncated.
+	// truncated body. an empty body has nothing to transform, so it is left
+	// alone. without a transform the body is logged as read, with the "..."
+	// marker appended when it was truncated.
 	switch {
-	case l.bodyFn != nil:
+	case l.bodyFn != nil && body != "":
 		body = l.bodyFn(body, hasMore)
 	case hasMore:
 		body += "..."

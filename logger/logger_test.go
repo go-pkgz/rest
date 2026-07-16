@@ -361,6 +361,20 @@ func TestGetBodyBodyFnNoWithBody(t *testing.T) {
 	assert.False(t, called, "bodyFn must not run when body logging is disabled")
 }
 
+func TestGetBodyBodyFnSkipsEmpty(t *testing.T) {
+	called := false
+	fn := func(string, bool) string {
+		called = true
+		return "should not appear" // non-empty even for empty input
+	}
+	req, err := http.NewRequest("GET", "http://example.com/", http.NoBody)
+	require.NoError(t, err)
+
+	l := New(WithBody, BodyFn(fn))
+	assert.Equal(t, "", l.getBody(req))
+	assert.False(t, called, "bodyFn must not run on an empty body")
+}
+
 func TestLoggerBodyFn(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
@@ -524,7 +538,7 @@ func TestLoggerApacheCombined(t *testing.T) {
 	s := lb.buf.String()
 	t.Log(s)
 	assert.True(t, strings.HasPrefix(s, "127.0.0.1!masked - user ["))
-	assert.True(t, strings.HasSuffix(s, ` "POST /blah?key=val&password=********&var=123" HTTP/1.1" 200 9 "" "Go-http-client/1.1"`), s)
+	assert.True(t, strings.HasSuffix(s, ` "POST /blah?key=val&password=********&var=123 HTTP/1.1" 200 9 "" "Go-http-client/1.1"`), s)
 }
 
 func TestAnonymizeIP(t *testing.T) {
