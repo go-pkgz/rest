@@ -300,6 +300,89 @@ func TestGetBody(t *testing.T) {
 	assert.Equal(t, "body", body)
 }
 
+func TestGetBodyBodyFn(t *testing.T) {
+	// arbitrary (non-json) transform: upper-cases a whole body, or wraps a
+	// truncated one with its flag - exercises both the transform and the flag
+	fn := func(body string, truncated bool) string {
+		if truncated {
+			return "<truncated:" + body + ">"
+		}
+		return strings.ToUpper(body)
+	}
+
+	tests := []struct {
+		name        string
+		body        string
+		maxBodySize int
+		want        string
+	}{
+		{"transforms body", "hello world", 1024, "HELLO WORLD"},
+		{"plain text, not json", "just text, no braces", 1024, "JUST TEXT, NO BRACES"},
+		{"empty body", "", 1024, ""},
+		{"collapses transform newlines", "a\nb", 1024, "A B"},
+		{"truncated flag set", "0123456789abc", 5, "<truncated:01234>"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest("POST", "http://example.com/", strings.NewReader(tt.body))
+			require.NoError(t, err)
+			l := New(WithBody, MaxBodySize(tt.maxBodySize), BodyFn(fn))
+			assert.Equal(t, tt.want, l.getBody(req))
+		})
+	}
+}
+
+func TestGetBodyBodyFnNoWithBody(t *testing.T) {
+	called := false
+	fn := func(string, bool) string {
+		called = true
+		return "should not appear"
+	}
+	req, err := http.NewRequest("POST", "http://example.com/", strings.NewReader("hello"))
+	require.NoError(t, err)
+
+	l := New(BodyFn(fn)) // no WithBody, body logging disabled
+	assert.Equal(t, "", l.getBody(req))
+	assert.False(t, called, "bodyFn must not run when body logging is disabled")
+}
+
+func TestLoggerBodyFn(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		// downstream handler still receives the original, unmasked body
+		assert.Equal(t, `{"user":"alice","password":"secret"}`, string(body))
+		_, err = w.Write([]byte("ok"))
+		require.NoError(t, err)
+	})
+
+	// plain-string masker, deliberately not json-aware, to show the transform
+	// need not parse the body
+	masker := func(body string, truncated bool) string {
+		if truncated {
+			return "[body too large]"
+		}
+		return strings.ReplaceAll(body, "secret", "****")
+	}
+
+	lb := &mockLgr{}
+	l := New(Prefix("[INFO] REST"), WithBody, Log(lb), BodyFn(masker))
+	ts := httptest.NewServer(l.Handler(handler))
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL+"/login", "application/json",
+		bytes.NewBufferString(`{"user":"alice","password":"secret"}`))
+	require.NoError(t, err)
+	defer resp.Body.Close() // nolint
+	assert.Equal(t, 200, resp.StatusCode)
+
+	s := lb.buf.String()
+	t.Log(s)
+	assert.Contains(t, s, `{"user":"alice","password":"****"}`)
+	assert.NotContains(t, s, "secret")
+}
+
 func TestPeek(t *testing.T) {
 	cases := []struct {
 		body    string
