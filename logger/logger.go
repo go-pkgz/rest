@@ -105,6 +105,9 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 			if unescURL, err := url.QueryUnescape(rawurl); err == nil {
 				rawurl = unescURL
 			}
+			// unescaping can surface line breaks the encoded url hid, collapse them the same way
+			// the body is collapsed so an embedded break can't forge additional log records
+			rawurl = lineBreaks.Replace(rawurl)
 
 			remoteIP, err := realip.Get(r)
 			if err != nil {

@@ -434,6 +434,35 @@ func TestLoggerBodyWithPercent(t *testing.T) {
 	assert.NotContains(t, s, "MISSING")
 }
 
+func TestLoggerURLCantForgeLogLine(t *testing.T) {
+	tests := []struct {
+		name string
+		esc  string // escaped line-break char in the query
+	}{
+		{"line feed", "%0A"},
+		{"carriage return", "%0D"},
+		{"vertical tab", "%0B"},
+		{"form feed", "%0C"},
+		{"next line", "%C2%85"},
+		{"line separator", "%E2%80%A8"},
+		{"paragraph separator", "%E2%80%A9"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lb := &mockLgr{}
+			l := New(Prefix("[INFO] REST"), Log(lb))
+			req := httptest.NewRequest("GET", "/x?q="+tt.esc+"[ERROR]%20forged", http.NoBody)
+			l.Handler(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).ServeHTTP(httptest.NewRecorder(), req)
+
+			s := lb.buf.String()
+			t.Log(s)
+			assert.Equal(t, 1, strings.Count(s, "[INFO] REST"), "single log record, no forged one")
+			assert.Contains(t, s, "/x?q= [ERROR] forged", "collapsed inline, not dropped")
+		})
+	}
+}
+
 func TestPeek(t *testing.T) {
 	cases := []struct {
 		body    string
