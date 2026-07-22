@@ -42,12 +42,20 @@ func matchSourceIP(r *http.Request, ips []string) (result bool, match string, er
 	if err != nil {
 		return false, "", fmt.Errorf("can't get realip: %w", err) // we can't get ip, so no match
 	}
-	// check for ip prefix or CIDR
+	parsedIP := net.ParseIP(ip)
+	// check for CIDR, complete IP, or IP prefix
 	for _, exclIP := range ips {
 		if _, cidrnet, err := net.ParseCIDR(exclIP); err == nil {
-			if cidrnet.Contains(net.ParseIP(ip)) {
+			if cidrnet.Contains(parsedIP) {
 				return true, ip, nil
 			}
+			continue
+		}
+		if allowedIP := net.ParseIP(exclIP); allowedIP != nil {
+			if allowedIP.Equal(parsedIP) {
+				return true, ip, nil
+			}
+			continue
 		}
 		if strings.HasPrefix(ip, exclIP) {
 			return true, ip, nil

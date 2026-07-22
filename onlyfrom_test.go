@@ -99,6 +99,34 @@ func TestOnlyFromAllowedCIDR(t *testing.T) {
 	assert.Equal(t, 403, resp.StatusCode)
 }
 
+func TestMatchSourceIPRules(t *testing.T) {
+	tests := []struct {
+		name    string
+		rule    string
+		source  string
+		matched bool
+	}{
+		{name: "complete IPv4", rule: "1.2.3.4", source: "1.2.3.4", matched: true},
+		{name: "complete IPv4 rejects textual prefix", rule: "1.2.3.4", source: "1.2.3.45", matched: false},
+		{name: "IPv4 prefix", rule: "1.2.3.", source: "1.2.3.45", matched: true},
+		{name: "IPv4 CIDR", rule: "1.2.3.0/24", source: "1.2.3.45", matched: true},
+		{name: "complete IPv6 normalized", rule: "2001:db8:0:0::1", source: "2001:db8::1", matched: true},
+		{name: "complete IPv6 rejects textual prefix", rule: "2001:db8::1", source: "2001:db8::10", matched: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+			req.Header.Set("X-Real-IP", tt.source)
+
+			matched, source, err := matchSourceIP(req, []string{tt.rule})
+			require.NoError(t, err)
+			assert.Equal(t, tt.matched, matched)
+			assert.Equal(t, tt.source, source)
+		})
+	}
+}
+
 func TestOnlyFromRejected(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
