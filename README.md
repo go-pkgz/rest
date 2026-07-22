@@ -106,7 +106,8 @@ It prevents server crashes in case of panic in one of the controllers.
 
 OnlyFrom middleware allows access from a limited list of source IPs.
 Such IPs can be defined as complete ip (like 192.168.1.12), prefix (129.168.) or CIDR (192.168.0.0/16).
-Complete IPs are matched exactly, while prefix rules use textual prefix matching.
+Complete IP rules use semantic address equality (so equivalent IPv6 spellings match), CIDRs use network containment,
+and all other rules use literal textual prefix matching.
 The middleware will respond with `StatusForbidden` (403) if the request comes from a different IP. 
 It supports both IPv4 and IPv6 and checks the usual headers like `X-Forwarded-For` and `X-Real-IP` and the remote address.
 

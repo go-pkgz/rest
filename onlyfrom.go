@@ -10,7 +10,8 @@ import (
 )
 
 // OnlyFrom middleware allows access for limited list of source IPs.
-// Such IPs can be defined as complete ip (like 192.168.1.12), prefix (129.168.) or CIDR (192.168.0.0/16)
+// Rules can be complete IPs (like 192.168.1.12), textual prefixes (129.168.), or CIDRs (192.168.0.0/16).
+// Complete IPs use semantic address equality, CIDRs use network containment, and all other rules use prefix matching.
 func OnlyFrom(onlyIps ...string) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +44,7 @@ func matchSourceIP(r *http.Request, ips []string) (result bool, match string, er
 		return false, "", fmt.Errorf("can't get realip: %w", err) // we can't get ip, so no match
 	}
 	parsedIP := net.ParseIP(ip)
-	// check for CIDR, complete IP, or IP prefix
+	// check for cidr, complete ip, or ip prefix
 	for _, exclIP := range ips {
 		if _, cidrnet, err := net.ParseCIDR(exclIP); err == nil {
 			if cidrnet.Contains(parsedIP) {
