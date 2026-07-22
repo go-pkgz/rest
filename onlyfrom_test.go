@@ -99,6 +99,42 @@ func TestOnlyFromAllowedCIDR(t *testing.T) {
 	assert.Equal(t, 403, resp.StatusCode)
 }
 
+func TestMatchSourceIPRules(t *testing.T) {
+	tests := []struct {
+		name    string
+		rules   []string
+		source  string
+		matched bool
+	}{
+		{name: "complete ipv4", rules: []string{"1.2.3.4"}, source: "1.2.3.4", matched: true},
+		{name: "complete ipv4 rejects textual prefix", rules: []string{"1.2.3.4"}, source: "1.2.3.45", matched: false},
+		{name: "ipv4 prefix", rules: []string{"1.2.3."}, source: "1.2.3.45", matched: true},
+		{name: "ipv4 cidr", rules: []string{"1.2.3.0/24"}, source: "1.2.3.45", matched: true},
+		{name: "complete ipv6 normalized", rules: []string{"2001:db8:0:0::1"}, source: "2001:db8::1", matched: true},
+		{
+			name: "complete ipv6 rejects textual prefix", rules: []string{"2001:db8::1"},
+			source: "2001:db8::10", matched: false,
+		},
+		{name: "ipv6 prefix", rules: []string{"2001:db8:"}, source: "2001:db8::10", matched: true},
+		{name: "ipv6 prefix rejects mismatch", rules: []string{"2001:db9:"}, source: "2001:db8::10", matched: false},
+		{name: "ipv6 cidr", rules: []string{"2001:db8::/32"}, source: "2001:db8::10", matched: true},
+		{name: "ipv6 cidr rejects mismatch", rules: []string{"2001:db9::/32"}, source: "2001:db8::10", matched: false},
+		{name: "later rule matches", rules: []string{"1.2.3.4", "5.6."}, source: "5.6.7.8", matched: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+			req.Header.Set("X-Real-IP", tt.source)
+
+			matched, source, err := matchSourceIP(req, tt.rules)
+			require.NoError(t, err)
+			assert.Equal(t, tt.matched, matched)
+			assert.Equal(t, tt.source, source)
+		})
+	}
+}
+
 func TestOnlyFromRejected(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("blah blah"))
