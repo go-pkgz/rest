@@ -242,17 +242,28 @@ router.Use(rest.CORS(
 Features:
 - Automatic preflight (OPTIONS) handling
 - Origin validation with case-insensitive matching
-- Credentials support (reflects origin instead of `*`)
+- Credentials support (reflects the request origin instead of `*`)
 - Configurable cache duration for preflight results
 - Cache-correct `Vary` headers (adds `Access-Control-Request-Method` and `Access-Control-Request-Headers` on preflight)
 
 Available options:
-- `CorsAllowedOrigins(origins...)` - allowed origins (default: `*`)
+- `CorsAllowedOrigins(origins...)` - allowed origins (default: `*`), can't include `*` with credentials enabled
 - `CorsAllowedMethods(methods...)` - allowed HTTP methods (default: GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD)
 - `CorsAllowedHeaders(headers...)` - allowed request headers (default: Accept, Content-Type, Authorization, X-Requested-With)
 - `CorsExposedHeaders(headers...)` - headers exposed to client
 - `CorsAllowCredentials(bool)` - enable credentials (cookies, auth headers)
 - `CorsMaxAge(seconds)` - preflight cache duration
+
+`CORS` panics if credentials are enabled while `*` is among the allowed origins, the default list included.
+That combination reflects any origin back together with `Access-Control-Allow-Credentials: true`, which lets
+any site read authenticated responses, so `rest.CORS(rest.CorsAllowCredentials(true))` has to name its origins:
+
+```go
+router.Use(rest.CORS(
+    rest.CorsAllowedOrigins("https://app.example.com"),
+    rest.CorsAllowCredentials(true),
+))
+```
 
 ### Secure middleware
 
