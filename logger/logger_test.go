@@ -283,7 +283,7 @@ type mockLgr struct {
 	buf bytes.Buffer
 }
 
-func (m *mockLgr) Logf(format string, args ...interface{}) {
+func (m *mockLgr) Logf(format string, args ...any) {
 	_, _ = m.buf.WriteString(fmt.Sprintf(format, args...))
 }
 
@@ -528,8 +528,6 @@ func TestSanitizeReqURL(t *testing.T) {
 	}
 	var l *Middleware
 	for i, tt := range tbl {
-		i := i
-		tt := tt
 		t.Run(tt.in, func(t *testing.T) {
 			assert.Equal(t, tt.out, unesc(l.sanitizeQuery(tt.in)), "check #%d, %s", i, tt.in)
 		})

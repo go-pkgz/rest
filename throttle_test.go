@@ -26,7 +26,7 @@ func TestThrottle(t *testing.T) {
 	var wg sync.WaitGroup
 
 	wg.Add(100)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		go func() {
 			defer wg.Done()
 			resp, err := http.Get(ts.URL)
@@ -71,7 +71,7 @@ func TestThrottleDisabled(t *testing.T) {
 	var wg sync.WaitGroup
 
 	wg.Add(100)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		go func() {
 			defer wg.Done()
 			resp, err := http.Get(ts.URL)
