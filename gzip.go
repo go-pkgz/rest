@@ -55,6 +55,9 @@ func Gzip(contentTypes ...string) func(http.Handler) http.Handler {
 
 	f := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// the representation depends on Accept-Encoding, caches must key on it even when not compressing
+			w.Header().Add("Vary", "Accept-Encoding")
+
 			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 				next.ServeHTTP(w, r)
 				return

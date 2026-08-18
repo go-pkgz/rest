@@ -108,7 +108,7 @@ func TestBenchmark_WithTimeRange(t *testing.T) {
 
 func TestBenchmark_Cleanup(t *testing.T) {
 	bench := NewBenchmarks()
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		bench.nowFn = func() time.Time {
 			return time.Date(2022, 5, 15, 0, 0, 0, 0, time.UTC).Add(time.Duration(i) * time.Second) // every 2s fake time
 		}
@@ -142,7 +142,7 @@ func TestBenchmarks_Handler(t *testing.T) {
 	ts := httptest.NewServer(bench.Handler(handler))
 	defer ts.Close()
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		resp, err := ts.Client().Get(ts.URL)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -176,7 +176,7 @@ func TestBenchmark_ConcurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// simulate concurrent updates
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -185,7 +185,7 @@ func TestBenchmark_ConcurrentAccess(t *testing.T) {
 	}
 
 	// simulate concurrent stats reads while updating
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -229,7 +229,7 @@ func TestBenchmark_TimeWindowBoundaries(t *testing.T) {
 	bench.nowFn = func() time.Time { return now }
 
 	// add data points exactly at minute boundaries
-	for i := 0; i < 120; i++ {
+	for i := range 120 {
 		bench.nowFn = func() time.Time {
 			return now.Add(time.Duration(i) * time.Second)
 		}

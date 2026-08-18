@@ -209,6 +209,12 @@ func TestEncodeJSON_EncodingError(t *testing.T) {
 	// channels cannot be encoded to JSON
 	err := EncodeJSON(w, http.StatusOK, make(chan int))
 	assert.Error(t, err)
+
+	// nothing was committed, so the caller can still answer with an error
+	assert.Empty(t, w.Body.String())
+	assert.Empty(t, w.Header().Get("Content-Type"))
+	http.Error(w, "oops", http.StatusInternalServerError)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
 func getTestHandlerBlah() http.HandlerFunc {
@@ -216,4 +222,21 @@ func getTestHandlerBlah() http.HandlerFunc {
 		_, _ = rw.Write([]byte("blah"))
 	}
 	return fn
+}
+
+// failingWriter fails on Write, mimicking a client that disconnected mid-response
+type failingWriter struct {
+	http.ResponseWriter
+	err error
+}
+
+func (f *failingWriter) Write([]byte) (int, error) { return 0, f.err }
+
+func TestEncodeJSON_WriteError(t *testing.T) {
+	wantErr := errors.New("connection reset")
+	w := &failingWriter{ResponseWriter: httptest.NewRecorder(), err: wantErr}
+
+	err := EncodeJSON(w, http.StatusOK, JSON{"key": "value"})
+	require.Error(t, err, "a failed write has to reach the caller")
+	assert.ErrorIs(t, err, wantErr)
 }
