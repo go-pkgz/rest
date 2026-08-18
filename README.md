@@ -102,6 +102,9 @@ Recoverer is a middleware that recovers from panics, logs the panic (and a backt
 and returns an HTTP 500 (Internal Server Error) status if possible. 
 It prevents server crashes in case of panic in one of the controllers.
 
+`http.ErrAbortHandler` is re-panicked untouched and neither logged nor turned into a 500, as `net/http`
+relies on the sentinel reaching the server to abort the response and close the connection.
+
 ### OnlyFrom middleware
 
 OnlyFrom middleware allows access from a limited list of source IPs.
@@ -116,11 +119,15 @@ _Note: headers should be trusted and set by a proxy, otherwise it is possible to
 ### Metrics middleware
 
 Metrics middleware responds to GET /metrics with list of [expvar](https://golang.org/pkg/expvar/). 
-Optionally allows a restricted list of source ips.
+Optionally allows a restricted list of source ips, i.e. `rest.Metrics("127.0.0.1", "192.168.0.0/16")`.
+Called without any ip, as `rest.Metrics()`, it serves every source.
 
 ### BlackWords middleware
 
 BlackWords middleware doesn't allow user-defined words in the request body.
+It reads the whole body to inspect it and responds with `StatusBadRequest` (400) if the body can't be read.
+The body is not capped on its own, so put `SizeLimit` in front of it to bound what a request can allocate:
+`rest.Wrap(handler, rest.SizeLimit(1024*1024), rest.BlackWords("word1", "word2"))`.
 
 ### SizeLimit middleware
 
@@ -192,7 +199,8 @@ Sets headers (passed as key:value) to requests. I.e. `rest.Headers("Server:MySer
 
 ### Gzip middleware
 
-Compresses response with gzip.
+Compresses response with gzip. Adds `Vary: Accept-Encoding` to every response it handles, compressed or not,
+so shared caches key on the encoding rather than serving gzip bytes to a client that never asked for them.
 
 ### RealIP middleware
 
@@ -457,7 +465,7 @@ example with chi router:
 - `realip.Get` - returns client's IP address
 - `rest.ParseFromTo` - parses "from" and "to" request's query params with various formats
 - `rest.DecodeJSON` - decodes request body to the provided struct
-- `rest.EncodeJSON` - encodes response body from the provided struct, sets `Content-Type` to `application/json` and sends the status code
+- `rest.EncodeJSON` - encodes response body from the provided struct, sets `Content-Type` to `application/json` and sends the status code. Encoding runs before anything is written, so a returned error leaves the response uncommitted and the caller can still replace it with an error status
 
 ## Profiler
 
