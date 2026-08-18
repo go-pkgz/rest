@@ -131,14 +131,38 @@ func TestBenchmark_Cleanup(t *testing.T) {
 	assert.Equal(t, 900, bench.data.Len())
 }
 
+// fakeClock drives Benchmarks without waiting on wall time
+type fakeClock struct {
+	mu sync.Mutex
+	t  time.Time
+}
+
+func (c *fakeClock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.t
+}
+
+func (c *fakeClock) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.t = c.t.Add(d)
+}
+
 func TestBenchmarks_Handler(t *testing.T) {
+	const reqDuration = 50 * time.Millisecond
+
+	clk := &fakeClock{t: time.Date(2022, 5, 15, 0, 0, 0, 0, time.UTC)}
+	bench := NewBenchmarks()
+	bench.nowFn = clk.now
+
+	// the handler burns fake time instead of sleeping, so every request measures exactly reqDuration
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		clk.advance(reqDuration)
 		_, err := w.Write([]byte("blah blah"))
-		time.Sleep(time.Millisecond * 50)
 		require.NoError(t, err)
 	})
 
-	bench := NewBenchmarks()
 	ts := httptest.NewServer(bench.Handler(handler))
 	defer ts.Close()
 
@@ -146,28 +170,23 @@ func TestBenchmarks_Handler(t *testing.T) {
 		resp, err := ts.Client().Get(ts.URL)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		require.NoError(t, resp.Body.Close())
 	}
 
-	{
-		res := bench.Stats(time.Minute)
-		t.Logf("%+v", res)
-		assert.Equal(t, 100, res.Requests)
-		assert.True(t, res.RequestsSec <= 20 && res.RequestsSec >= 10)
-		assert.InDelta(t, 50000, res.AverageRespTime, 10000)
-		assert.InDelta(t, 50000, res.MinRespTime, 10000)
-		assert.InDelta(t, 50000, res.MaxRespTime, 10000)
-		assert.True(t, res.MaxRespTime >= res.MinRespTime)
-	}
+	// 100 requests of 50ms cover 5s of fake time, landing in six one-second buckets
+	const wantRespTime = int64(50000) // microseconds
+	wantRate := 100.0 / 6.0
 
-	{
-		res := bench.Stats(time.Minute * 15)
-		t.Logf("%+v", res)
-		assert.Equal(t, 100, res.Requests)
-		assert.True(t, res.RequestsSec <= 20 && res.RequestsSec >= 10, res.RequestsSec)
-		assert.InDelta(t, 50000, res.AverageRespTime, 10000)
-		assert.InDelta(t, 50000, res.MinRespTime, 10000)
-		assert.InDelta(t, 50000, res.MaxRespTime, 10000)
-		assert.True(t, res.MaxRespTime >= res.MinRespTime)
+	for _, interval := range []time.Duration{time.Minute, 15 * time.Minute} {
+		t.Run(interval.String(), func(t *testing.T) {
+			res := bench.Stats(interval)
+			t.Logf("%+v", res)
+			assert.Equal(t, 100, res.Requests)
+			assert.InDelta(t, wantRate, res.RequestsSec, 0.001)
+			assert.Equal(t, wantRespTime, res.AverageRespTime)
+			assert.Equal(t, wantRespTime, res.MinRespTime)
+			assert.Equal(t, wantRespTime, res.MaxRespTime)
+		})
 	}
 }
 
