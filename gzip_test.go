@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -790,4 +791,43 @@ func TestGzipWriterCapabilitiesMatchUnderlying(t *testing.T) {
 			assert.Equal(t, tt.wantHijacker, gotHijacker, "Hijacker must be advertised only when it works")
 		})
 	}
+}
+
+func TestGzipSwitchingProtocolsWithoutContentType(t *testing.T) {
+	// the plain upgrade sequence: 101 with no content type, then the handler takes the connection.
+	// the status has to be on the wire before Hijack, or it is never sent at all
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Upgrade", "foo")
+		w.Header().Set("Connection", "Upgrade")
+		w.WriteHeader(http.StatusSwitchingProtocols)
+
+		hj, ok := w.(http.Hijacker)
+		require.True(t, ok, "upgrade needs a Hijacker")
+		conn, buf, err := hj.Hijack()
+		require.NoError(t, err)
+		defer conn.Close()
+
+		_, err = buf.WriteString("raw-protocol-bytes")
+		require.NoError(t, err)
+		require.NoError(t, buf.Flush())
+	})
+
+	ts := httptest.NewServer(Gzip()(handler))
+	defer ts.Close()
+
+	conn, err := net.Dial("tcp", strings.TrimPrefix(ts.URL, "http://"))
+	require.NoError(t, err)
+	defer conn.Close()
+
+	_, err = fmt.Fprint(conn, "GET /upgrade HTTP/1.1\r\nHost: example.com\r\n"+
+		"Accept-Encoding: gzip\r\nUpgrade: foo\r\nConnection: Upgrade\r\n\r\n")
+	require.NoError(t, err)
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(5*time.Second)))
+
+	got, err := io.ReadAll(conn)
+	require.NoError(t, err)
+
+	assert.Contains(t, string(got), "101 Switching Protocols", "the 101 status line must reach the client")
+	assert.Contains(t, string(got), "raw-protocol-bytes")
+	assert.NotContains(t, string(got), "Content-Encoding: gzip", "an upgraded connection must not be gzipped")
 }
