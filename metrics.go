@@ -12,9 +12,11 @@ func Metrics(onlyIps ...string) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == "GET" && strings.HasSuffix(strings.ToLower(r.URL.Path), "/metrics") {
-				if matched, ip, err := matchSourceIP(r, onlyIps); !matched || err != nil {
-					_ = EncodeJSON(w, http.StatusForbidden, JSON{"error": fmt.Sprintf("ip %s rejected", ip)})
-					return
+				if len(onlyIps) > 0 { // no restrictions if no ips defined
+					if matched, ip, err := matchSourceIP(r, onlyIps); !matched || err != nil {
+						_ = EncodeJSON(w, http.StatusForbidden, JSON{"error": fmt.Sprintf("ip %s rejected", ip)})
+						return
+					}
 				}
 				expvar.Handler().ServeHTTP(w, r)
 				return
