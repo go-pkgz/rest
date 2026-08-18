@@ -465,7 +465,7 @@ example with chi router:
 - `realip.Get` - returns client's IP address
 - `rest.ParseFromTo` - parses "from" and "to" request's query params with various formats
 - `rest.DecodeJSON` - decodes request body to the provided struct
-- `rest.EncodeJSON` - encodes response body from the provided struct, sets `Content-Type` to `application/json` and sends the status code. Encoding runs before anything is written, so a returned error leaves the response uncommitted and the caller can still replace it with an error status
+- `rest.EncodeJSON` - encodes response body from the provided struct, sets `Content-Type` to `application/json` and sends the status code. The value is encoded before anything is written, so an encoding failure leaves the response uncommitted and the caller can still replace it with an error status. Write failures are reported too, by which point the response has already been committed
 
 ## Profiler
 

@@ -223,3 +223,20 @@ func getTestHandlerBlah() http.HandlerFunc {
 	}
 	return fn
 }
+
+// failingWriter fails on Write, mimicking a client that disconnected mid-response
+type failingWriter struct {
+	http.ResponseWriter
+	err error
+}
+
+func (f *failingWriter) Write([]byte) (int, error) { return 0, f.err }
+
+func TestEncodeJSON_WriteError(t *testing.T) {
+	wantErr := errors.New("connection reset")
+	w := &failingWriter{ResponseWriter: httptest.NewRecorder(), err: wantErr}
+
+	err := EncodeJSON(w, http.StatusOK, JSON{"key": "value"})
+	require.Error(t, err, "a failed write has to reach the caller")
+	assert.ErrorIs(t, err, wantErr)
+}
