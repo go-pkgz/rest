@@ -206,6 +206,15 @@ Sets headers (passed as key:value) to requests. I.e. `rest.Headers("Server:MySer
 Compresses response with gzip. Adds `Vary: Accept-Encoding` to every response it handles, compressed or not,
 so shared caches key on the encoding rather than serving gzip bytes to a client that never asked for them.
 
+The decision is made on the **response** content type, either the one the handler set or, when it set none,
+the type sniffed from the first chunk of the body. By default the common textual types are compressed
+(`text/html`, `text/plain`, `text/css`, `text/xml`, `text/javascript`, `application/javascript`,
+`application/x-javascript`, `application/json`); pass your own list to override, i.e. `rest.Gzip("text/html")`.
+
+`Accept-Encoding` is parsed rather than substring-matched, so `gzip;q=0` is honoured as a refusal. Responses
+without a body (204 and 304) are left alone, `Content-Length` is dropped when the body is compressed, and
+`Flush` and `Hijack` pass through so streaming responses and protocol upgrades keep working.
+
 ### RealIP middleware
 
 RealIP is a middleware that sets a http.Request's RemoteAddr to the results of parsing various headers that contain the client's real IP address. It checks headers in the following priority order:
