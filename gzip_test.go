@@ -677,3 +677,62 @@ func TestGzipPanicLeavesResponseUncommitted(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode,
 		"a panicking handler must not be committed as 200 by the gzip wrapper")
 }
+
+func TestGzipNoBodyAndUpgradeStatuses(t *testing.T) {
+	tbl := []struct {
+		name   string
+		status int
+	}{
+		{"reset content", http.StatusResetContent},
+		{"no content", http.StatusNoContent},
+		{"not modified", http.StatusNotModified},
+	}
+
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.status)
+			})
+			ts := httptest.NewServer(Gzip()(handler))
+			defer ts.Close()
+
+			req, err := http.NewRequest("GET", ts.URL+"/x", http.NoBody)
+			require.NoError(t, err)
+			req.Header.Set("Accept-Encoding", "gzip")
+
+			resp, err := http.DefaultTransport.RoundTrip(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.status, resp.StatusCode)
+			assert.Empty(t, resp.Header.Get("Content-Encoding"), "a status without content must not be compressed")
+		})
+	}
+}
+
+func TestGzipSwitchingProtocolsIsFinal(t *testing.T) {
+	// 101 hands the connection over, it must not be treated as an interim 1xx
+	rec := httptest.NewRecorder()
+	gw := &gzipResponseWriter{ResponseWriter: rec, gzCts: gzDefaultContentTypes}
+	gw.Header().Set("Content-Type", "text/plain")
+	gw.WriteHeader(http.StatusSwitchingProtocols)
+	gw.close(true)
+
+	assert.Equal(t, http.StatusSwitchingProtocols, rec.Code)
+	assert.Empty(t, rec.Header().Get("Content-Encoding"), "an upgraded connection must not be gzipped")
+}
+
+func TestGzipNoSniffWhenAlreadyEncoded(t *testing.T) {
+	// net/http suppresses sniffing for an encoded body, a guessed type would just mislabel it
+	rec := httptest.NewRecorder()
+	gw := &gzipResponseWriter{ResponseWriter: rec, gzCts: gzDefaultContentTypes}
+	gw.Header().Set("Content-Encoding", "br")
+
+	_, err := gw.Write([]byte("plain looking text that would sniff as text/plain"))
+	require.NoError(t, err)
+	gw.close(true)
+
+	assert.Empty(t, rec.Header().Get("Content-Type"), "no content type should be guessed from encoded bytes")
+	assert.Equal(t, "br", rec.Header().Get("Content-Encoding"))
+}

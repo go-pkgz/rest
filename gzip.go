@@ -42,8 +42,9 @@ type gzipResponseWriter struct {
 }
 
 func (w *gzipResponseWriter) WriteHeader(status int) {
-	// 1xx are interim responses, they pass straight through and the final status still follows
-	if status >= 100 && status < 200 {
+	// 1xx are interim responses, they pass straight through and the final status still follows.
+	// 101 is the exception, it hands the connection to another protocol and is final.
+	if status >= 100 && status < 200 && status != http.StatusSwitchingProtocols {
 		w.ResponseWriter.WriteHeader(status)
 		return
 	}
@@ -64,7 +65,9 @@ func (w *gzipResponseWriter) WriteHeader(status int) {
 func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 	if !w.decided {
 		ctype := w.Header().Get("Content-Type")
-		if ctype == "" {
+		// net/http suppresses sniffing for an already encoded body, guessing a type from
+		// compressed bytes would only mislabel it
+		if ctype == "" && w.Header().Get("Content-Encoding") == "" {
 			ctype = http.DetectContentType(b)
 			w.Header().Set("Content-Type", ctype)
 		}
@@ -83,7 +86,8 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 func (w *gzipResponseWriter) decide(ctype string) {
 	w.decided = true
 
-	if w.status == http.StatusNoContent || w.status == http.StatusNotModified {
+	switch w.status {
+	case http.StatusSwitchingProtocols, http.StatusNoContent, http.StatusResetContent, http.StatusNotModified:
 		return // these carry no body to compress
 	}
 	if w.Header().Get("Content-Encoding") != "" {
