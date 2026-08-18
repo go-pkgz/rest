@@ -154,7 +154,8 @@ func TestCORS_Credentials(t *testing.T) {
 		for _, tt := range tbl {
 			t.Run(tt.name, func(t *testing.T) {
 				assert.PanicsWithValue(t,
-					`rest: CORS with credentials can't allow "*" as an origin, list the allowed origins explicitly`,
+					`rest: CORS with credentials can't allow "*" as an origin, list the allowed origins explicitly `+
+						`or opt in with CorsUnsafeAnyOriginWithCredentials`,
 					func() { CORS(tt.opts...) })
 			})
 		}
@@ -361,5 +362,49 @@ func TestCORS_Integration(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, "https://app.example.com", resp.Header.Get("Access-Control-Allow-Origin"))
 		assert.Contains(t, resp.Header.Get("Access-Control-Expose-Headers"), "X-Request-Id")
+	})
+}
+
+func TestCORS_UnsafeAnyOriginWithCredentials(t *testing.T) {
+	handler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})
+
+	t.Run("opting in keeps the wildcard working", func(t *testing.T) {
+		tbl := []struct {
+			name string
+			opts []CorsOpt
+		}{
+			{"default origins", []CorsOpt{
+				CorsAllowCredentials(true), CorsUnsafeAnyOriginWithCredentials(true)}},
+			{"explicit wildcard", []CorsOpt{
+				CorsAllowedOrigins("*"), CorsAllowCredentials(true), CorsUnsafeAnyOriginWithCredentials(true)}},
+		}
+		for _, tt := range tbl {
+			t.Run(tt.name, func(t *testing.T) {
+				req := httptest.NewRequest("GET", "/test", http.NoBody)
+				req.Header.Set("Origin", "https://any.example.com")
+				w := httptest.NewRecorder()
+
+				require.NotPanics(t, func() { CORS(tt.opts...)(handler).ServeHTTP(w, req) })
+				resp := w.Result()
+				defer resp.Body.Close()
+
+				// the origin is reflected, not "*", which is what credentials require
+				assert.Equal(t, "https://any.example.com", resp.Header.Get("Access-Control-Allow-Origin"))
+				assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
+			})
+		}
+	})
+
+	t.Run("opting in without credentials changes nothing", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
+		req.Header.Set("Origin", "https://any.example.com")
+		w := httptest.NewRecorder()
+
+		CORS(CorsUnsafeAnyOriginWithCredentials(true))(handler).ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		assert.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
+		assert.Empty(t, resp.Header.Get("Access-Control-Allow-Credentials"))
 	})
 }

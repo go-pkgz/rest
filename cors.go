@@ -24,9 +24,14 @@ type CORSConfig struct {
 	// default: empty
 	ExposedHeaders []string
 	// AllowCredentials indicates whether the request can include credentials.
-	// when true, AllowedOrigins cannot contain "*" and CORS panics if it does.
+	// when true, AllowedOrigins cannot contain "*" unless UnsafeAnyOriginWithCredentials is set,
+	// and CORS panics otherwise.
 	// default: false
 	AllowCredentials bool
+	// UnsafeAnyOriginWithCredentials permits "*" together with credentials, making the middleware
+	// reflect whatever Origin the request carries alongside Access-Control-Allow-Credentials.
+	// default: false
+	UnsafeAnyOriginWithCredentials bool
 	// MaxAge indicates how long (in seconds) the results of a preflight can be cached.
 	// default: 0 (no caching)
 	MaxAge int
@@ -84,6 +89,17 @@ func CorsAllowCredentials(allow bool) CorsOpt {
 	}
 }
 
+// CorsUnsafeAnyOriginWithCredentials permits "*" among the allowed origins together with credentials.
+// The middleware then reflects whatever Origin the request carries and sends
+// Access-Control-Allow-Credentials: true with it, so any site a signed-in user visits can read
+// authenticated responses. Only use it for a service meant to be embedded on arbitrary third-party
+// origins, and make sure state-changing requests are protected by something other than the origin.
+func CorsUnsafeAnyOriginWithCredentials(allow bool) CorsOpt {
+	return func(c *CORSConfig) {
+		c.UnsafeAnyOriginWithCredentials = allow
+	}
+}
+
 // CorsMaxAge sets how long (in seconds) preflight results can be cached.
 func CorsMaxAge(seconds int) CorsOpt {
 	return func(c *CORSConfig) {
@@ -104,8 +120,9 @@ func CORS(opts ...CorsOpt) func(http.Handler) http.Handler {
 		opt(&cfg)
 	}
 
-	if cfg.AllowCredentials && slices.Contains(cfg.AllowedOrigins, "*") {
-		panic(`rest: CORS with credentials can't allow "*" as an origin, list the allowed origins explicitly`)
+	if cfg.AllowCredentials && !cfg.UnsafeAnyOriginWithCredentials && slices.Contains(cfg.AllowedOrigins, "*") {
+		panic(`rest: CORS with credentials can't allow "*" as an origin, list the allowed origins explicitly ` +
+			`or opt in with CorsUnsafeAnyOriginWithCredentials`)
 	}
 
 	// pre-compute joined strings for performance
@@ -151,8 +168,8 @@ func CORS(opts ...CorsOpt) func(http.Handler) http.Handler {
 			// set Vary header for caching
 			w.Header().Add("Vary", "Origin")
 
-			// set allowed origin, allowAll rules out credentials as the constructor panics on that combination
-			if allowAll {
+			// set allowed origin
+			if allowAll && !cfg.AllowCredentials {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 			} else {
 				// reflect the specific origin (required for credentials)

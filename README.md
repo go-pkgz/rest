@@ -252,16 +252,30 @@ Available options:
 - `CorsAllowedHeaders(headers...)` - allowed request headers (default: Accept, Content-Type, Authorization, X-Requested-With)
 - `CorsExposedHeaders(headers...)` - headers exposed to client
 - `CorsAllowCredentials(bool)` - enable credentials (cookies, auth headers)
+- `CorsUnsafeAnyOriginWithCredentials(bool)` - allow `*` together with credentials, see below
 - `CorsMaxAge(seconds)` - preflight cache duration
 
 `CORS` panics if credentials are enabled while `*` is among the allowed origins, the default list included.
 That combination reflects any origin back together with `Access-Control-Allow-Credentials: true`, which lets
-any site read authenticated responses, so `rest.CORS(rest.CorsAllowCredentials(true))` has to name its origins:
+any site a signed-in user visits read authenticated responses, so it should not be reached by accident.
+Name the origins instead:
 
 ```go
 router.Use(rest.CORS(
     rest.CorsAllowedOrigins("https://app.example.com"),
     rest.CorsAllowCredentials(true),
+))
+```
+
+A service that genuinely has to accept credentialed requests from arbitrary third-party origins, such as an
+embeddable widget, can opt back in explicitly. Do this only when state-changing requests are protected by
+something other than the origin:
+
+```go
+router.Use(rest.CORS(
+    rest.CorsAllowedOrigins("*"),
+    rest.CorsAllowCredentials(true),
+    rest.CorsUnsafeAnyOriginWithCredentials(true),
 ))
 ```
 
