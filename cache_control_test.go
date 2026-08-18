@@ -177,3 +177,67 @@ func TestCacheControlDynamic_IfNoneMatch(t *testing.T) {
 		assert.True(t, handlerCalled, "handler should be called on cache miss")
 	})
 }
+
+func TestEtagMatches(t *testing.T) {
+	const etag = `"abc123"`
+
+	tbl := []struct {
+		name   string
+		header string
+		want   bool
+	}{
+		{"empty header", "", false},
+		{"exact match", `"abc123"`, true},
+		{"no match", `"other"`, false},
+		{"list, first", `"abc123", "other"`, true},
+		{"list, last", `"other", "abc123"`, true},
+		{"list, absent", `"one", "two"`, false},
+		{"weak validator on header tag", `W/"abc123"`, true},
+		{"weak validator in list", `"one", W/"abc123"`, true},
+		{"wildcard alone does not match", "*", false},
+		{"substring is not a match", `"abc12"`, false},
+		{"superstring is not a match", `"abc1234"`, false},
+		{"unquoted is not a match", "abc123", false},
+		{"spacing tolerated", `   "abc123"   `, true},
+	}
+
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, etagMatches(tt.header, etag))
+		})
+	}
+}
+
+func TestCacheControl_ConditionalMethods(t *testing.T) {
+	// the etag of http://example.com/foo with version v1
+	const knownEtag = `"b433be1ea19edaee9dc92ca4b895b6bdf3c058cb"`
+
+	tbl := []struct {
+		method     string
+		wantStatus int
+		wantCalled bool
+	}{
+		{http.MethodGet, http.StatusNotModified, false},
+		{http.MethodHead, http.StatusNotModified, false},
+		{http.MethodPut, http.StatusOK, true},
+		{http.MethodPost, http.StatusOK, true},
+		{http.MethodDelete, http.StatusOK, true},
+		{http.MethodPatch, http.StatusOK, true},
+	}
+
+	for _, tt := range tbl {
+		t.Run(tt.method, func(t *testing.T) {
+			var called bool
+			handler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true })
+
+			req := httptest.NewRequest(tt.method, "http://example.com/foo", http.NoBody)
+			req.Header.Set("If-None-Match", knownEtag)
+			w := httptest.NewRecorder()
+
+			CacheControl(time.Hour, "v1")(handler).ServeHTTP(w, req)
+
+			assert.Equal(t, tt.wantStatus, w.Code, "unsafe methods carry preconditions this middleware doesn't enforce")
+			assert.Equal(t, tt.wantCalled, called)
+		})
+	}
+}
