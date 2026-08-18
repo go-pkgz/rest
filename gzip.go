@@ -61,8 +61,9 @@ func (w *gzipResponseWriter) WriteHeader(status int) {
 	w.status = status
 
 	// with a content type in hand the decision can be made right away, otherwise it waits for the
-	// first Write so the body can be sniffed
-	if ctype := w.Header().Get("Content-Type"); ctype != "" {
+	// first Write so the body can be sniffed. 101 cannot wait: the upgrade sequence carries no body
+	// and usually no content type, and the Hijack that follows would leave the status unsent
+	if ctype := w.Header().Get("Content-Type"); ctype != "" || status == http.StatusSwitchingProtocols {
 		w.decide(ctype)
 		w.commit()
 	}
