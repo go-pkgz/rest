@@ -142,18 +142,35 @@ func TestCORS_Credentials(t *testing.T) {
 		assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
 	})
 
-	t.Run("wildcard with credentials reflects origin", func(t *testing.T) {
+	t.Run("credentials with wildcard origins rejected", func(t *testing.T) {
+		tbl := []struct {
+			name string
+			opts []CorsOpt
+		}{
+			{"default origins", []CorsOpt{CorsAllowCredentials(true)}},
+			{"explicit wildcard", []CorsOpt{CorsAllowedOrigins("*"), CorsAllowCredentials(true)}},
+			{"wildcard among others", []CorsOpt{CorsAllowedOrigins("https://app.example.com", "*"), CorsAllowCredentials(true)}},
+		}
+		for _, tt := range tbl {
+			t.Run(tt.name, func(t *testing.T) {
+				assert.PanicsWithValue(t,
+					`rest: CORS with credentials can't allow "*" as an origin, list the allowed origins explicitly`,
+					func() { CORS(tt.opts...) })
+			})
+		}
+	})
+
+	t.Run("wildcard without credentials allowed", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Origin", "https://any.example.com")
 		w := httptest.NewRecorder()
 
-		CORS(CorsAllowCredentials(true))(handler).ServeHTTP(w, req)
+		CORS()(handler).ServeHTTP(w, req)
 		resp := w.Result()
 		defer resp.Body.Close()
 
-		// with credentials, must reflect origin, not "*"
-		assert.Equal(t, "https://any.example.com", resp.Header.Get("Access-Control-Allow-Origin"))
-		assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
+		assert.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
+		assert.Empty(t, resp.Header.Get("Access-Control-Allow-Credentials"))
 	})
 }
 
