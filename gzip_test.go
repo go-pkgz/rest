@@ -64,6 +64,50 @@ func TestGzipCustom(t *testing.T) {
 
 }
 
+func TestGzipVary(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte(strings.Repeat("compress me. ", 50)))
+		require.NoError(t, err)
+	})
+	ts := httptest.NewServer(Gzip()(handler))
+	defer ts.Close()
+
+	tbl := []struct {
+		name           string
+		acceptEncoding string
+		encoded        bool
+	}{
+		{"gzip accepted", "gzip", true},
+		{"gzip not accepted", "", false},
+		{"other encoding", "br", false},
+	}
+
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", ts.URL+"/something", http.NoBody)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "text/plain")
+			if tt.acceptEncoding != "" {
+				req.Header.Set("Accept-Encoding", tt.acceptEncoding)
+			} else {
+				req.Header.Set("Accept-Encoding", "identity")
+			}
+
+			resp, err := http.DefaultTransport.RoundTrip(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			// caches must be told the body varies by Accept-Encoding whether or not it got compressed
+			assert.Contains(t, resp.Header.Values("Vary"), "Accept-Encoding")
+			if tt.encoded {
+				assert.Equal(t, "gzip", resp.Header.Get("Content-Encoding"))
+				return
+			}
+			assert.Empty(t, resp.Header.Get("Content-Encoding"))
+		})
+	}
+}
+
 func TestGzipWriteHeader(t *testing.T) {
 	// test that explicit WriteHeader call works with gzip middleware
 	longText := strings.Repeat("This is a test message for gzip compression. ", 20)
