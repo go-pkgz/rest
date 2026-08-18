@@ -118,9 +118,13 @@ _Note: headers should be trusted and set by a proxy, otherwise it is possible to
 
 ### Metrics middleware
 
-Metrics middleware responds to GET /metrics with list of [expvar](https://golang.org/pkg/expvar/). 
-Optionally allows a restricted list of source ips, i.e. `rest.Metrics("127.0.0.1", "192.168.0.0/16")`.
-Called without any ip, as `rest.Metrics()`, it serves every source.
+Metrics middleware responds to GET /metrics with list of [expvar](https://golang.org/pkg/expvar/),
+limited to a list of source ips, i.e. `rest.Metrics("127.0.0.1", "192.168.0.0/16")`.
+Called without any ip, as `rest.Metrics()`, it rejects every request.
+
+To serve the endpoint to everyone, ask for it explicitly with `rest.MetricsAllowAll()`. Note that expvar
+publishes `cmdline`, which usually carries the flag values the process was started with, so only do this
+where something else already keeps the endpoint private.
 
 ### BlackWords middleware
 
