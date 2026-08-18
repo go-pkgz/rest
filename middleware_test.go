@@ -133,6 +133,32 @@ func TestMiddleware_Recoverer(t *testing.T) {
 	assert.Equal(t, "blah blah", string(b))
 }
 
+func TestMiddleware_RecovererAbortHandler(t *testing.T) {
+	handler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		panic(http.ErrAbortHandler)
+	})
+	l := &mockLgr{}
+
+	t.Run("propagated to the caller", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/failed", http.NoBody)
+		w := httptest.NewRecorder()
+		assert.PanicsWithValue(t, http.ErrAbortHandler, func() {
+			Recoverer(l)(handler).ServeHTTP(w, req)
+		})
+		assert.Empty(t, l.buf.String(), "abort sentinel should not be logged")
+		assert.Empty(t, w.Body.String(), "no error body should be written")
+	})
+
+	t.Run("connection aborted without response", func(t *testing.T) {
+		// net/http recovers the sentinel itself and closes the connection without a reply
+		ts := httptest.NewServer(Recoverer(l)(handler))
+		defer ts.Close()
+
+		_, err := http.Get(ts.URL + "/failed")
+		require.Error(t, err, "server must drop the connection instead of answering 500")
+	})
+}
+
 func TestWrap(t *testing.T) {
 	handler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		t.Logf("%s", r.URL.String())
@@ -378,6 +404,6 @@ type mockLgr struct {
 	buf bytes.Buffer
 }
 
-func (m *mockLgr) Logf(format string, args ...interface{}) {
+func (m *mockLgr) Logf(format string, args ...any) {
 	_, _ = m.buf.WriteString(fmt.Sprintf(format+"\n", args...))
 }
