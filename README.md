@@ -179,10 +179,12 @@ router.Use(rest.CacheControlDynamic(time.Hour, func(r *http.Request) string { re
 
 Conditional requests are handled for GET and HEAD only: an `If-None-Match` carrying the current etag gets a
 `StatusNotModified` (304) and the handler is skipped. The header is parsed as a proper tag list, so
-comma-separated values and the `W/` weak-validator prefix are understood and a tag only matches in full.
+comma-separated values and the `W/` weak-validator prefix are understood and a tag only matches in full;
+repeated `If-None-Match` fields count as one list, so a match in any of them is honoured.
 Requests with other methods are passed to the handler untouched, since their preconditions need to know
 whether the resource exists and this middleware can't answer that. The `*` wildcard is not matched for the
-same reason.
+same reason, and a request also carrying `If-Match` or `If-Unmodified-Since` is left to the handler, since
+those outrank `If-None-Match` and may call for a `StatusPreconditionFailed` (412) that a 304 would hide.
 
 ### Headers middleware
 

@@ -31,8 +31,15 @@ func CacheControlDynamic(expiration time.Duration, versionFn func(r *http.Reques
 			w.Header().Set("Etag", e)
 			w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d, no-cache", int(expiration.Seconds())))
 
-			if r.Method == http.MethodGet || r.Method == http.MethodHead {
-				if match := r.Header.Get("If-None-Match"); etagMatches(match, e) {
+			// If-Match and If-Unmodified-Since outrank If-None-Match and can call for a 412, which only
+			// the handler can decide, so answering 304 over them would hide it. Presence is enough,
+			// and it is checked across every field as repeated ones all count
+			preconditioned := len(r.Header.Values("If-Match")) > 0 || len(r.Header.Values("If-Unmodified-Since")) > 0
+
+			safeMethod := r.Method == http.MethodGet || r.Method == http.MethodHead
+
+			if safeMethod && !preconditioned {
+				if etagMatches(r.Header.Values("If-None-Match"), e) {
 					w.WriteHeader(http.StatusNotModified)
 					return
 				}
@@ -43,22 +50,22 @@ func CacheControlDynamic(expiration time.Duration, versionFn func(r *http.Reques
 	}
 }
 
-// etagMatches reports whether an If-None-Match header carries the given etag.
-// Handles comma-separated lists and the W/ weak-validator prefix, comparing with the weak
-// comparison of RFC 9110. The "*" wildcard is deliberately not matched here, as it asks whether
-// any representation exists and the middleware can't answer that before the handler runs.
-func etagMatches(header, etag string) bool {
-	if header == "" {
-		return false
-	}
+// etagMatches reports whether any If-None-Match header field carries the given etag.
+// Repeated fields form a single list, so all of them are examined. Handles comma-separated lists
+// and the W/ weak-validator prefix, comparing with the weak comparison of RFC 9110. The "*"
+// wildcard is deliberately not matched here, as it asks whether any representation exists and the
+// middleware can't answer that before the handler runs.
+func etagMatches(headers []string, etag string) bool {
 	etag = strings.TrimPrefix(strings.TrimSpace(etag), "W/")
-	for tag := range strings.SplitSeq(header, ",") {
-		tag = strings.TrimSpace(tag)
-		if tag == "" || tag == "*" {
-			continue
-		}
-		if strings.TrimPrefix(tag, "W/") == etag {
-			return true
+	for _, header := range headers {
+		for tag := range strings.SplitSeq(header, ",") {
+			tag = strings.TrimSpace(tag)
+			if tag == "" || tag == "*" {
+				continue
+			}
+			if strings.TrimPrefix(tag, "W/") == etag {
+				return true
+			}
 		}
 	}
 	return false

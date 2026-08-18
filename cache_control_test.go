@@ -203,7 +203,7 @@ func TestEtagMatches(t *testing.T) {
 
 	for _, tt := range tbl {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, etagMatches(tt.header, etag))
+			assert.Equal(t, tt.want, etagMatches([]string{tt.header}, etag))
 		})
 	}
 }
@@ -237,6 +237,85 @@ func TestCacheControl_ConditionalMethods(t *testing.T) {
 			CacheControl(time.Hour, "v1")(handler).ServeHTTP(w, req)
 
 			assert.Equal(t, tt.wantStatus, w.Code, "unsafe methods carry preconditions this middleware doesn't enforce")
+			assert.Equal(t, tt.wantCalled, called)
+		})
+	}
+}
+
+func TestEtagMatchesRepeatedFields(t *testing.T) {
+	const etag = `"abc123"`
+
+	tbl := []struct {
+		name    string
+		headers []string
+		want    bool
+	}{
+		{"no fields", nil, false},
+		{"single field, match", []string{`"abc123"`}, true},
+		{"match in the second field", []string{`"one"`, `"abc123"`}, true},
+		{"match in the third field", []string{`"one"`, `"two"`, `"abc123"`}, true},
+		{"absent from every field", []string{`"one"`, `"two"`}, false},
+		{"weak validator in a later field", []string{`"one"`, `W/"abc123"`}, true},
+	}
+
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, etagMatches(tt.headers, etag))
+		})
+	}
+}
+
+func TestCacheControl_RepeatedIfNoneMatchHeader(t *testing.T) {
+	// the etag of http://example.com/foo with version v1
+	const knownEtag = `"b433be1ea19edaee9dc92ca4b895b6bdf3c058cb"`
+
+	var called bool
+	handler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true })
+
+	req := httptest.NewRequest("GET", "http://example.com/foo", http.NoBody)
+	// repeated fields are one list, a match in any of them counts
+	req.Header.Add("If-None-Match", `"something-else"`)
+	req.Header.Add("If-None-Match", knownEtag)
+	w := httptest.NewRecorder()
+
+	CacheControl(time.Hour, "v1")(handler).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotModified, w.Code)
+	assert.False(t, called)
+}
+
+func TestCacheControl_HigherPriorityPreconditions(t *testing.T) {
+	const knownEtag = `"b433be1ea19edaee9dc92ca4b895b6bdf3c058cb"`
+
+	tbl := []struct {
+		name       string
+		header     string
+		value      string
+		wantStatus int
+		wantCalled bool
+	}{
+		{"no other precondition", "", "", http.StatusNotModified, false},
+		{"if-match present", "If-Match", `"other"`, http.StatusOK, true},
+		{"if-unmodified-since present", "If-Unmodified-Since", "Wed, 21 Oct 2015 07:28:00 GMT", http.StatusOK, true},
+		{"if-match present but empty", "If-Match", "", http.StatusOK, true},
+	}
+
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			var called bool
+			handler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true })
+
+			req := httptest.NewRequest("GET", "http://example.com/foo", http.NoBody)
+			req.Header.Set("If-None-Match", knownEtag)
+			if tt.header != "" {
+				req.Header.Add(tt.header, tt.value) // Add keeps an empty value as a present field
+			}
+			w := httptest.NewRecorder()
+
+			CacheControl(time.Hour, "v1")(handler).ServeHTTP(w, req)
+
+			// a 304 here would hide the 412 the handler may need to send
+			assert.Equal(t, tt.wantStatus, w.Code)
 			assert.Equal(t, tt.wantCalled, called)
 		})
 	}
