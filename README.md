@@ -211,9 +211,12 @@ the type sniffed from the first chunk of the body. By default the common textual
 (`text/html`, `text/plain`, `text/css`, `text/xml`, `text/javascript`, `application/javascript`,
 `application/x-javascript`, `application/json`); pass your own list to override, i.e. `rest.Gzip("text/html")`.
 
-`Accept-Encoding` is parsed rather than substring-matched, so `gzip;q=0` is honoured as a refusal. Responses
-without a body (204 and 304) are left alone, `Content-Length` is dropped when the body is compressed, and
-`Flush` and `Hijack` pass through so streaming responses and protocol upgrades keep working.
+`Accept-Encoding` is parsed rather than substring-matched, so `gzip;q=0` is honoured as a refusal and a named
+`gzip` entry outranks a `*` wildcard. Compression is skipped for responses that carry no body (204 and 304),
+for responses the handler already encoded (`Content-Encoding` set), and for partial responses (206 or a
+`Content-Range`), whose offsets describe the uncompressed representation. `Content-Length` is dropped when the
+body is compressed, interim 1xx responses pass through without becoming the final status, and `Flush` and
+`Hijack` pass through so streaming responses and protocol upgrades keep working.
 
 ### RealIP middleware
 

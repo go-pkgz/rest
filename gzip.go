@@ -35,15 +35,22 @@ type gzipResponseWriter struct {
 	gzCts       []string
 	gz          *gzip.Writer
 	status      int
+	statusSet   bool
 	decided     bool
 	wroteHeader bool
 	hijacked    bool
 }
 
 func (w *gzipResponseWriter) WriteHeader(status int) {
-	if w.wroteHeader {
+	// 1xx are interim responses, they pass straight through and the final status still follows
+	if status >= 100 && status < 200 {
+		w.ResponseWriter.WriteHeader(status)
 		return
 	}
+	if w.statusSet {
+		return // net/http keeps the first final status, so later calls are ignored here too
+	}
+	w.statusSet = true
 	w.status = status
 
 	// with a content type in hand the decision can be made right away, otherwise it waits for the
@@ -79,6 +86,12 @@ func (w *gzipResponseWriter) decide(ctype string) {
 	if w.status == http.StatusNoContent || w.status == http.StatusNotModified {
 		return // these carry no body to compress
 	}
+	if w.Header().Get("Content-Encoding") != "" {
+		return // the handler encoded the body itself, wrapping it again would mislabel the result
+	}
+	if w.status == http.StatusPartialContent || w.Header().Get("Content-Range") != "" {
+		return // the range metadata describes the identity representation
+	}
 
 	for _, c := range w.gzCts {
 		if !strings.HasPrefix(strings.ToLower(ctype), strings.ToLower(c)) {
@@ -102,16 +115,19 @@ func (w *gzipResponseWriter) commit() {
 }
 
 // close finishes the gzip stream and makes sure the status reaches the client even if the handler
-// wrote no body at all
-func (w *gzipResponseWriter) close() {
+// wrote no body at all. finished reports whether the handler returned normally: when it panicked
+// instead, an uncommitted response is left alone so a recoverer upstream can still make it a 500.
+func (w *gzipResponseWriter) close(finished bool) {
 	if w.hijacked {
 		return // the handler owns the connection now, nothing may be written to it
 	}
-	if !w.decided {
-		w.decide(w.Header().Get("Content-Type"))
-	}
-	if !w.wroteHeader {
-		w.commit()
+	if w.wroteHeader || finished {
+		if !w.decided {
+			w.decide(w.Header().Get("Content-Type"))
+		}
+		if !w.wroteHeader {
+			w.commit()
+		}
 	}
 	if w.gz == nil {
 		return
@@ -125,6 +141,11 @@ func (w *gzipResponseWriter) close() {
 func (w *gzipResponseWriter) Flush() {
 	if w.hijacked {
 		return
+	}
+	// decide before the headers leave, otherwise a later write could be compressed after the client
+	// was already told the body is identity
+	if !w.decided {
+		w.decide(w.Header().Get("Content-Type"))
 	}
 	if !w.wroteHeader {
 		w.commit()
@@ -170,31 +191,52 @@ func Gzip(contentTypes ...string) func(http.Handler) http.Handler {
 			// the representation depends on Accept-Encoding, caches must key on it even when not compressing
 			w.Header().Add("Vary", "Accept-Encoding")
 
-			if !acceptsGzip(r.Header.Get("Accept-Encoding")) {
+			if !acceptsGzip(r.Header.Values("Accept-Encoding")) {
 				next.ServeHTTP(w, r)
 				return
 			}
 
 			gw := &gzipResponseWriter{ResponseWriter: w, gzCts: gzCts}
-			defer gw.close()
+			finished := false
+			defer func() { gw.close(finished) }()
+
 			next.ServeHTTP(gw, r)
+			finished = true
 		})
 	}
 }
 
-// acceptsGzip reports whether the client accepts gzip, honoring an explicit q=0 rejection
-func acceptsGzip(header string) bool {
-	for enc := range strings.SplitSeq(header, ",") {
-		name, params, _ := strings.Cut(strings.TrimSpace(enc), ";")
-		if n := strings.ToLower(strings.TrimSpace(name)); n != "gzip" && n != "*" {
-			continue
-		}
-		if q, ok := strings.CutPrefix(strings.ToLower(strings.TrimSpace(params)), "q="); ok {
-			if v, err := strconv.ParseFloat(strings.TrimSpace(q), 64); err == nil && v == 0 {
-				continue // explicitly not acceptable
+// acceptsGzip reports whether the client accepts gzip, honoring an explicit q=0 rejection.
+// A named gzip entry decides the answer on its own, as it takes precedence over the "*" wildcard.
+// Repeated Accept-Encoding fields form a single list, so every field is examined.
+func acceptsGzip(headers []string) bool {
+	var wildcard, wildcardSeen bool
+
+	for _, header := range headers {
+		for enc := range strings.SplitSeq(header, ",") {
+			name, params, _ := strings.Cut(strings.TrimSpace(enc), ";")
+			n := strings.ToLower(strings.TrimSpace(name))
+			if n != "gzip" && n != "*" {
+				continue
+			}
+			acceptable := !rejectedByQuality(params)
+			if n == "gzip" {
+				return acceptable
+			}
+			if !wildcardSeen {
+				wildcard, wildcardSeen = acceptable, true
 			}
 		}
-		return true
 	}
-	return false
+	return wildcard
+}
+
+// rejectedByQuality reports whether the parameters of an Accept-Encoding entry carry q=0
+func rejectedByQuality(params string) bool {
+	q, ok := strings.CutPrefix(strings.ToLower(strings.TrimSpace(params)), "q=")
+	if !ok {
+		return false
+	}
+	v, err := strconv.ParseFloat(strings.TrimSpace(q), 64)
+	return err == nil && v == 0
 }

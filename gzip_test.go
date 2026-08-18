@@ -289,11 +289,16 @@ func TestGzipAcceptEncoding(t *testing.T) {
 		{"*;q=0", false},
 		{"deflate, gzip;q=1.0, *;q=0.5", true},
 		{"GZIP", true},
+		{"gzip;q=0, *;q=1", false},
+		{"*;q=1, gzip;q=0", false},
+		{"*;q=0, gzip", true},
+		{"*;q=0, gzip;q=1", true},
+		{"br;q=1, *;q=0", false},
 	}
 
 	for _, tt := range tbl {
 		t.Run(tt.header, func(t *testing.T) {
-			assert.Equal(t, tt.want, acceptsGzip(tt.header))
+			assert.Equal(t, tt.want, acceptsGzip([]string{tt.header}))
 		})
 	}
 }
@@ -460,7 +465,7 @@ func TestGzipWriterInterfaces(t *testing.T) {
 		gw.Header().Set("Content-Type", "text/plain")
 		gw.WriteHeader(http.StatusTeapot)
 		gw.WriteHeader(http.StatusOK)
-		gw.close()
+		gw.close(true)
 		assert.Equal(t, http.StatusTeapot, rec.Code)
 	})
 
@@ -468,7 +473,207 @@ func TestGzipWriterInterfaces(t *testing.T) {
 		rec := httptest.NewRecorder()
 		gw := &gzipResponseWriter{ResponseWriter: rec, gzCts: gzDefaultContentTypes}
 		gw.Flush()
-		gw.close()
+		gw.close(true)
 		assert.Equal(t, http.StatusOK, rec.Code)
 	})
+}
+
+func TestGzipSkipsAlreadyEncoded(t *testing.T) {
+	// a handler that encoded the body itself must not be wrapped a second time
+	payload := []byte("pretend this is brotli")
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Encoding", "br")
+		_, err := w.Write(payload)
+		require.NoError(t, err)
+	})
+	ts := httptest.NewServer(Gzip()(handler))
+	defer ts.Close()
+
+	req, err := http.NewRequest("GET", ts.URL+"/asset", http.NoBody)
+	require.NoError(t, err)
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, "br", resp.Header.Get("Content-Encoding"))
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, payload, b, "body must be passed through untouched")
+}
+
+func TestGzipSkipsPartialContent(t *testing.T) {
+	body := strings.Repeat("range me. ", 60)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Range", "bytes 0-599/1200")
+		w.WriteHeader(http.StatusPartialContent)
+		_, err := w.Write([]byte(body))
+		require.NoError(t, err)
+	})
+	ts := httptest.NewServer(Gzip()(handler))
+	defer ts.Close()
+
+	req, err := http.NewRequest("GET", ts.URL+"/ranged", http.NoBody)
+	require.NoError(t, err)
+	req.Header.Set("Accept-Encoding", "gzip")
+	req.Header.Set("Range", "bytes=0-599")
+
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusPartialContent, resp.StatusCode)
+	// the range offsets describe the uncompressed representation, compressing would invalidate them
+	assert.Empty(t, resp.Header.Get("Content-Encoding"))
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, body, string(b))
+}
+
+func TestGzipFlushBeforeWrite(t *testing.T) {
+	// flushing before any write commits the headers, so the decision has to be settled by then
+	body := strings.Repeat("late text. ", 50)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.(http.Flusher).Flush() // no Content-Type set yet
+		_, err := w.Write([]byte(body))
+		require.NoError(t, err)
+	})
+	ts := httptest.NewServer(Gzip()(handler))
+	defer ts.Close()
+
+	req, err := http.NewRequest("GET", ts.URL+"/flush-first", http.NoBody)
+	require.NoError(t, err)
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	// whatever was decided, the body has to match what the headers advertise
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gzr, err := gzip.NewReader(bytes.NewReader(raw))
+		require.NoError(t, err)
+		raw, err = io.ReadAll(gzr)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, body, string(raw), "body must decode according to the advertised encoding")
+}
+
+func TestGzipFirstStatusWins(t *testing.T) {
+	rec := httptest.NewRecorder()
+	gw := &gzipResponseWriter{ResponseWriter: rec, gzCts: gzDefaultContentTypes}
+
+	// no Content-Type, so the first call cannot commit yet, but it still fixes the status
+	gw.WriteHeader(http.StatusTeapot)
+	gw.WriteHeader(http.StatusOK)
+	gw.close(true)
+
+	assert.Equal(t, http.StatusTeapot, rec.Code)
+}
+
+func TestGzipInterimResponse(t *testing.T) {
+	body := strings.Repeat("after early hints. ", 40)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Link", "</style.css>; rel=preload; as=style")
+		w.WriteHeader(http.StatusEarlyHints) // interim, the real status still follows
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(body))
+		require.NoError(t, err)
+	})
+	ts := httptest.NewServer(Gzip()(handler))
+	defer ts.Close()
+
+	req, err := http.NewRequest("GET", ts.URL+"/hints", http.NoBody)
+	require.NoError(t, err)
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "the interim status must not become the final one")
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gzr, err := gzip.NewReader(bytes.NewReader(raw))
+		require.NoError(t, err)
+		raw, err = io.ReadAll(gzr)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, body, string(raw))
+}
+
+func TestGzipAcceptEncodingRepeatedFields(t *testing.T) {
+	tbl := []struct {
+		name    string
+		headers []string
+		want    bool
+	}{
+		{"no fields", nil, false},
+		{"gzip in the second field", []string{"br", "gzip"}, true},
+		{"refusal in a later field beats an earlier wildcard", []string{"*;q=1", "gzip;q=0"}, false},
+		{"acceptance in a later field beats an earlier wildcard refusal", []string{"*;q=0", "gzip"}, true},
+		{"wildcard only, split across fields", []string{"br", "*"}, true},
+		{"nothing acceptable", []string{"br", "deflate"}, false},
+	}
+
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, acceptsGzip(tt.headers))
+		})
+	}
+}
+
+func TestGzipRepeatedAcceptEncodingOverWire(t *testing.T) {
+	body := strings.Repeat("no gzip please. ", 50)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, err := w.Write([]byte(body))
+		require.NoError(t, err)
+	})
+	ts := httptest.NewServer(Gzip()(handler))
+	defer ts.Close()
+
+	req, err := http.NewRequest("GET", ts.URL+"/split", http.NoBody)
+	require.NoError(t, err)
+	// two fields are one list, and the named gzip refusal has to win over the wildcard
+	req.Header.Add("Accept-Encoding", "*;q=1")
+	req.Header.Add("Accept-Encoding", "gzip;q=0")
+
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Empty(t, resp.Header.Get("Content-Encoding"))
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, body, string(b))
+}
+
+func TestGzipPanicLeavesResponseUncommitted(t *testing.T) {
+	handler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		panic("boom")
+	})
+	l := &mockLgr{}
+	// Recoverer sits outside Gzip, so it can only send a 500 while the response is uncommitted
+	ts := httptest.NewServer(Recoverer(l)(Gzip()(handler)))
+	defer ts.Close()
+
+	req, err := http.NewRequest("GET", ts.URL+"/panics", http.NoBody)
+	require.NoError(t, err)
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode,
+		"a panicking handler must not be committed as 200 by the gzip wrapper")
 }
