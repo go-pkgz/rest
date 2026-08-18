@@ -209,6 +209,12 @@ func TestEncodeJSON_EncodingError(t *testing.T) {
 	// channels cannot be encoded to JSON
 	err := EncodeJSON(w, http.StatusOK, make(chan int))
 	assert.Error(t, err)
+
+	// nothing was committed, so the caller can still answer with an error
+	assert.Empty(t, w.Body.String())
+	assert.Empty(t, w.Header().Get("Content-Type"))
+	http.Error(w, "oops", http.StatusInternalServerError)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
 func getTestHandlerBlah() http.HandlerFunc {
