@@ -2,6 +2,7 @@ package rest
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -97,4 +98,31 @@ func TestBlackwordsContentType(t *testing.T) {
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+}
+
+// errReader fails partway through, mimicking a truncated or aborted request body
+type errReader struct {
+	data []byte
+	pos  int
+}
+
+func (e *errReader) Read(p []byte) (int, error) {
+	if e.pos >= len(e.data) {
+		return 0, errors.New("read failed")
+	}
+	n := copy(p, e.data[e.pos:])
+	e.pos += n
+	return n, nil
+}
+
+func TestBlackwordsUnreadableBody(t *testing.T) {
+	var called bool
+	handler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true })
+
+	req := httptest.NewRequest("POST", "/", &errReader{data: []byte("badword and more")})
+	w := httptest.NewRecorder()
+	BlackWords("badword")(handler).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.False(t, called, "handler must not run on a body that can't be inspected")
 }
