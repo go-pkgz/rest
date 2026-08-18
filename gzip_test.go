@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -449,7 +450,7 @@ func TestGzipWriterInterfaces(t *testing.T) {
 
 	t.Run("hijack unsupported by the underlying writer", func(t *testing.T) {
 		gw := &gzipResponseWriter{ResponseWriter: httptest.NewRecorder(), gzCts: gzDefaultContentTypes}
-		_, _, err := gw.Hijack()
+		_, _, err := gw.hijack()
 		assert.Error(t, err)
 	})
 
@@ -472,7 +473,7 @@ func TestGzipWriterInterfaces(t *testing.T) {
 	t.Run("flush without a body commits the status", func(t *testing.T) {
 		rec := httptest.NewRecorder()
 		gw := &gzipResponseWriter{ResponseWriter: rec, gzCts: gzDefaultContentTypes}
-		gw.Flush()
+		gw.flush()
 		gw.close(true)
 		assert.Equal(t, http.StatusOK, rec.Code)
 	})
@@ -735,4 +736,58 @@ func TestGzipNoSniffWhenAlreadyEncoded(t *testing.T) {
 
 	assert.Empty(t, rec.Header().Get("Content-Type"), "no content type should be guessed from encoded bytes")
 	assert.Equal(t, "br", rec.Header().Get("Content-Encoding"))
+}
+
+func TestGzipWriterCapabilitiesMatchUnderlying(t *testing.T) {
+	body := strings.Repeat("stream me. ", 40)
+
+	tbl := []struct {
+		name         string
+		wrap         func(http.Handler) http.Handler
+		wantFlusher  bool
+		wantHijacker bool
+	}{
+		{
+			name:         "plain server writer",
+			wrap:         func(h http.Handler) http.Handler { return h },
+			wantFlusher:  true,
+			wantHijacker: true,
+		},
+		{
+			// http.TimeoutHandler offers neither, so the wrapper must not claim them either
+			name:         "behind Timeout",
+			wrap:         Timeout(time.Minute),
+			wantFlusher:  false,
+			wantHijacker: false,
+		},
+	}
+
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotFlusher, gotHijacker bool
+			handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, gotFlusher = w.(http.Flusher)
+				_, gotHijacker = w.(http.Hijacker)
+				w.Header().Set("Content-Type", "text/plain")
+				_, err := w.Write([]byte(body))
+				require.NoError(t, err)
+			})
+
+			ts := httptest.NewServer(tt.wrap(Gzip()(handler)))
+			defer ts.Close()
+
+			req, err := http.NewRequest("GET", ts.URL+"/x", http.NoBody)
+			require.NoError(t, err)
+			req.Header.Set("Accept-Encoding", "gzip")
+
+			resp, err := http.DefaultTransport.RoundTrip(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			_, err = io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantFlusher, gotFlusher, "Flusher must be advertised only when it works")
+			assert.Equal(t, tt.wantHijacker, gotHijacker, "Hijacker must be advertised only when it works")
+		})
+	}
 }

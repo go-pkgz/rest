@@ -216,7 +216,13 @@ the type sniffed from the first chunk of the body. By default the common textual
 for responses the handler already encoded (`Content-Encoding` set), and for partial responses (206 or a
 `Content-Range`), whose offsets describe the uncompressed representation. `Content-Length` is dropped when the
 body is compressed, interim 1xx responses pass through without becoming the final status, and `Flush` and
-`Hijack` pass through so streaming responses and protocol upgrades keep working.
+`Hijack` pass through so streaming responses and protocol upgrades keep working. The wrapper offers those two
+only when the writer beneath it does, so composing with `Timeout`, which offers neither, does not leave a
+handler with a `Flush` that silently does nothing.
+
+One deviation is worth knowing about: sniffing means the status cannot be sent until the body arrives, so when
+a handler calls `WriteHeader` without setting `Content-Type`, headers it changes before the first `Write` still
+reach the client, where `net/http` would have ignored them.
 
 ### RealIP middleware
 
