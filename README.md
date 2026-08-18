@@ -167,6 +167,23 @@ router.Use(rest.StripSlashes)
 
 Sets a number of HTTP headers to prevent a router (handler's) response from being cached by an upstream proxy and/or client.
 
+### CacheControl middleware
+
+Sets `Cache-Control` with the given expiration and an `Etag` derived from the request URL plus a version,
+either a fixed string (`CacheControl`) or one computed per request (`CacheControlDynamic`).
+
+```go
+router.Use(rest.CacheControl(time.Hour, "v1"))
+router.Use(rest.CacheControlDynamic(time.Hour, func(r *http.Request) string { return userVersion(r) }))
+```
+
+Conditional requests are handled for GET and HEAD only: an `If-None-Match` carrying the current etag gets a
+`StatusNotModified` (304) and the handler is skipped. The header is parsed as a proper tag list, so
+comma-separated values and the `W/` weak-validator prefix are understood and a tag only matches in full.
+Requests with other methods are passed to the handler untouched, since their preconditions need to know
+whether the resource exists and this middleware can't answer that. The `*` wildcard is not matched for the
+same reason.
+
 ### Headers middleware
 
 Sets headers (passed as key:value) to requests. I.e. `rest.Headers("Server:MyServer", "X-Blah:Foo")`
