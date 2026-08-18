@@ -29,6 +29,12 @@ var gzPool = sync.Pool{
 
 // gzipResponseWriter defers the compression decision until the response content type is known,
 // either from the header the handler set or sniffed from the first chunk of the body.
+//
+// One consequence is worth knowing about: when the handler calls WriteHeader without a Content-Type,
+// the status cannot be sent yet, because the body has to be sniffed first. Headers changed between
+// that call and the first Write therefore still reach the client, where net/http would have ignored
+// them. Handlers that mutate headers after WriteHeader are relying on a no-op, so this is more
+// permissive rather than wrong, but it is a difference from the bare ResponseWriter.
 type gzipResponseWriter struct {
 	http.ResponseWriter
 
@@ -141,8 +147,8 @@ func (w *gzipResponseWriter) close(finished bool) {
 	w.gz = nil
 }
 
-// Flush pushes buffered data out, keeping streaming responses working through the compressor
-func (w *gzipResponseWriter) Flush() {
+// flush pushes buffered data out, keeping streaming responses working through the compressor
+func (w *gzipResponseWriter) flush() {
 	if w.hijacked {
 		return
 	}
@@ -162,17 +168,57 @@ func (w *gzipResponseWriter) Flush() {
 	}
 }
 
-// Hijack passes through to the underlying writer for protocol upgrades
-func (w *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+// hijack passes through to the underlying writer for protocol upgrades
+func (w *gzipResponseWriter) hijack() (net.Conn, *bufio.ReadWriter, error) {
 	h, ok := w.ResponseWriter.(http.Hijacker)
 	if !ok {
 		return nil, nil, fmt.Errorf("http.Hijacker not supported")
+	}
+	// finish the stream first, whatever the handler already wrote has to reach the wire before
+	// the connection changes hands
+	if w.gz != nil {
+		_ = w.gz.Close()
+		gzPool.Put(w.gz)
+		w.gz = nil
 	}
 	conn, rw, err := h.Hijack()
 	if err == nil {
 		w.hijacked = true
 	}
 	return conn, rw, err
+}
+
+// the wrapper must offer exactly the optional interfaces the underlying writer has, otherwise a
+// handler's type assertion succeeds and the call then does nothing, which is how http.TimeoutHandler
+// (offering neither) would silently lose a Flush
+type gzipFlusher struct{ *gzipResponseWriter }
+
+func (w gzipFlusher) Flush() { w.flush() }
+
+type gzipHijacker struct{ *gzipResponseWriter }
+
+func (w gzipHijacker) Hijack() (net.Conn, *bufio.ReadWriter, error) { return w.hijack() }
+
+type gzipFlushHijacker struct{ *gzipResponseWriter }
+
+func (w gzipFlushHijacker) Flush() { w.flush() }
+
+func (w gzipFlushHijacker) Hijack() (net.Conn, *bufio.ReadWriter, error) { return w.hijack() }
+
+// wrapGzipWriter picks the variant matching the capabilities of the writer underneath
+func wrapGzipWriter(gw *gzipResponseWriter) http.ResponseWriter {
+	_, isFlusher := gw.ResponseWriter.(http.Flusher)
+	_, isHijacker := gw.ResponseWriter.(http.Hijacker)
+
+	switch {
+	case isFlusher && isHijacker:
+		return gzipFlushHijacker{gw}
+	case isFlusher:
+		return gzipFlusher{gw}
+	case isHijacker:
+		return gzipHijacker{gw}
+	}
+	return gw
 }
 
 // Unwrap exposes the underlying writer to http.ResponseController
@@ -204,7 +250,7 @@ func Gzip(contentTypes ...string) func(http.Handler) http.Handler {
 			finished := false
 			defer func() { gw.close(finished) }()
 
-			next.ServeHTTP(gw, r)
+			next.ServeHTTP(wrapGzipWriter(gw), r)
 			finished = true
 		})
 	}
