@@ -175,18 +175,29 @@ func (w *gzipResponseWriter) hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if !ok {
 		return nil, nil, fmt.Errorf("http.Hijacker not supported")
 	}
-	// finish the stream first, whatever the handler already wrote has to reach the wire before
-	// the connection changes hands
+	// finish the stream first, whatever the handler already wrote has to reach the wire before the
+	// connection changes hands, and a failure there means truncated output rather than something to
+	// swallow behind a successful hijack
 	if w.gz != nil {
-		_ = w.gz.Close()
+		if err := w.gz.Close(); err != nil {
+			return nil, nil, fmt.Errorf("finish gzip stream before hijack: %w", err)
+		}
+	}
+
+	conn, rw, err := h.Hijack()
+	if err != nil {
+		// the connection was not taken over, so the writer stays attached and closed: a handler that
+		// carries on writing now gets an error instead of appending raw bytes to a body already
+		// advertised as gzip, and the deferred close still returns the writer to the pool
+		return nil, nil, err
+	}
+
+	if w.gz != nil {
 		gzPool.Put(w.gz)
 		w.gz = nil
 	}
-	conn, rw, err := h.Hijack()
-	if err == nil {
-		w.hijacked = true
-	}
-	return conn, rw, err
+	w.hijacked = true
+	return conn, rw, nil
 }
 
 // the wrapper must offer exactly the optional interfaces the underlying writer has, otherwise a
