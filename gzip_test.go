@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"errors"
@@ -830,4 +831,86 @@ func TestGzipSwitchingProtocolsWithoutContentType(t *testing.T) {
 	assert.Contains(t, string(got), "101 Switching Protocols", "the 101 status line must reach the client")
 	assert.Contains(t, string(got), "raw-protocol-bytes")
 	assert.NotContains(t, string(got), "Content-Encoding: gzip", "an upgraded connection must not be gzipped")
+}
+
+// hijackStub is a ResponseWriter whose Hijack and Write can be made to fail on demand
+type hijackStub struct {
+	http.ResponseWriter
+	hijackErr error
+	writeErr  error
+	written   bytes.Buffer
+}
+
+func (h *hijackStub) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h.hijackErr != nil {
+		return nil, nil, h.hijackErr
+	}
+	return nil, nil, nil
+}
+
+func (h *hijackStub) Write(b []byte) (int, error) {
+	if h.writeErr != nil {
+		return 0, h.writeErr
+	}
+	return h.written.Write(b)
+}
+
+func TestGzipHijackErrorPath(t *testing.T) {
+	t.Run("failing stream close is reported, not swallowed", func(t *testing.T) {
+		stub := &hijackStub{ResponseWriter: httptest.NewRecorder()}
+		gw := &gzipResponseWriter{ResponseWriter: stub, gzCts: gzDefaultContentTypes}
+		gw.Header().Set("Content-Type", "text/plain")
+
+		_, err := gw.Write([]byte(strings.Repeat("compress me. ", 40)))
+		require.NoError(t, err)
+		require.NotNil(t, gw.gz, "the stream has to be open for this case to mean anything")
+
+		boom := errors.New("write failed")
+		stub.writeErr = boom // the flush inside gz.Close now fails
+
+		_, _, err = gw.hijack()
+		require.Error(t, err, "a truncated stream must not be hidden behind a successful hijack")
+		assert.ErrorIs(t, err, boom)
+		assert.False(t, gw.hijacked)
+	})
+
+	t.Run("failed hijack leaves the stream attached so writes error instead of corrupting", func(t *testing.T) {
+		nope := errors.New("already hijacked")
+		stub := &hijackStub{ResponseWriter: httptest.NewRecorder(), hijackErr: nope}
+		gw := &gzipResponseWriter{ResponseWriter: stub, gzCts: gzDefaultContentTypes}
+		gw.Header().Set("Content-Type", "text/plain")
+
+		_, err := gw.Write([]byte(strings.Repeat("compress me. ", 40)))
+		require.NoError(t, err)
+
+		_, _, err = gw.hijack()
+		require.ErrorIs(t, err, nope)
+
+		assert.False(t, gw.hijacked, "the connection was never taken over")
+		require.NotNil(t, gw.gz, "the writer stays attached so a further write cannot bypass it")
+		assert.Equal(t, "gzip", gw.Header().Get("Content-Encoding"))
+
+		// the response already advertises gzip, so raw bytes must not be appended to it
+		_, err = gw.Write([]byte("RAW-AFTER-FAILED-HIJACK"))
+		require.Error(t, err, "writing after a failed hijack has to fail rather than corrupt the body")
+		assert.NotContains(t, stub.written.String(), "RAW-AFTER-FAILED-HIJACK")
+
+		// the deferred close still returns the writer to the pool
+		gw.close(true)
+		assert.Nil(t, gw.gz)
+	})
+
+	t.Run("successful hijack releases the writer", func(t *testing.T) {
+		stub := &hijackStub{ResponseWriter: httptest.NewRecorder()}
+		gw := &gzipResponseWriter{ResponseWriter: stub, gzCts: gzDefaultContentTypes}
+		gw.Header().Set("Content-Type", "text/plain")
+
+		_, err := gw.Write([]byte(strings.Repeat("compress me. ", 40)))
+		require.NoError(t, err)
+
+		_, _, err = gw.hijack()
+		require.NoError(t, err)
+		assert.True(t, gw.hijacked)
+		assert.Nil(t, gw.gz, "the writer goes back to the pool once the connection is taken over")
+	})
 }
