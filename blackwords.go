@@ -9,6 +9,16 @@ import (
 
 // BlackWords middleware doesn't allow some words in the request body
 func BlackWords(words ...string) func(http.Handler) http.Handler {
+	return blackWords(func() []string { return words })
+}
+
+// BlackWordsFn middleware uses func to get the list and doesn't allow some words in the request body.
+// The func is called for every request, so the list can be changed at runtime.
+func BlackWordsFn(fn func() []string) func(http.Handler) http.Handler {
+	return blackWords(fn)
+}
+
+func blackWords(wordsFn func() []string) func(http.Handler) http.Handler {
 
 	return func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
@@ -23,7 +33,7 @@ func BlackWords(words ...string) func(http.Handler) http.Handler {
 
 			body := strings.ToLower(string(content))
 			if body != "" {
-				for _, word := range words {
+				for _, word := range wordsFn() {
 					if strings.Contains(body, strings.ToLower(word)) {
 						_ = EncodeJSON(w, http.StatusForbidden, JSON{"error": "one of blacklisted words detected"})
 						return
@@ -34,9 +44,4 @@ func BlackWords(words ...string) func(http.Handler) http.Handler {
 		}
 		return http.HandlerFunc(fn)
 	}
-}
-
-// BlackWordsFn middleware uses func to get the list and doesn't allow some words in the request body
-func BlackWordsFn(fn func() []string) func(http.Handler) http.Handler {
-	return BlackWords(fn()...)
 }

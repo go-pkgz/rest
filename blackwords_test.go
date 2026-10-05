@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBlackwords(t *testing.T) {
@@ -123,4 +125,37 @@ func TestBlackwordsUnreadableBody(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.False(t, called, "handler must not run on a body that can't be inspected")
+}
+
+func TestBlackwordsFnDynamic(t *testing.T) {
+	var mu sync.Mutex
+	words := []string{"bad1"}
+	bwMiddleware := BlackWordsFn(func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return words
+	})
+
+	ts := httptest.NewServer(bwMiddleware(getTestHandlerBlah()))
+	defer ts.Close()
+
+	send := func(body string) int {
+		req, err := http.NewRequest("POST", ts.URL+"/something", bytes.NewBufferString(body))
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	assert.Equal(t, http.StatusForbidden, send("has bad1 in it"))
+	assert.Equal(t, http.StatusOK, send("has bad2 in it"))
+
+	// the list is changed after the middleware was created, it should be picked up by the next request
+	mu.Lock()
+	words = []string{"bad2"}
+	mu.Unlock()
+
+	assert.Equal(t, http.StatusOK, send("has bad1 in it"))
+	assert.Equal(t, http.StatusForbidden, send("has bad2 in it"))
 }
