@@ -11,16 +11,24 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.24", "stable"]
+        go: ["go.mod", "stable"]
 
     steps:
       - name: checkout
         uses: actions/checkout@v4
 
+      - name: read go version from go.mod
+        id: gomod
+        run: |
+          version=$(awk '/^go /{split($2, v, "."); print v[1] "." v[2]; exit}' go.mod)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: set up go ${{ matrix.go }}
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ matrix.go == 'stable' && 'stable' || steps.gomod.outputs.version }}
+          check-latest: true
         id: go
 
       - name: build and test
