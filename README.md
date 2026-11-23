@@ -9,11 +9,11 @@
 
 ### AppInfo middleware
 
-Adds info to every response header:
+`rest.AppInfo(app, author, version string)` adds info to every response header:
 - App-Name - application name
 - App-Version - application version
-- Org - organization
-- M-Host - host name from instance-level `$MHOST` env
+- Author - author or organization
+- Host - host name from instance-level `$MHOST` env, sent only when the variable is set
 
 ### Ping-Pong middleware
 
@@ -31,7 +31,7 @@ Content-Length: 4
 Connection: keep-alive
 App-Name: remark42
 App-Version: master-ed92a0b-20180630-15:59:56
-Org: Umputun
+Author: umputun
 
 pong
 ```
@@ -39,6 +39,7 @@ pong
 ### Health middleware
 
 Responds with the status 200 if all health checks passed, 503 if any failed. Both health path and check functions passed by consumer.
+Only `GET` requests to the health path are answered; other methods are passed to the next handler.
 For production usage this middleware should be used with throttler/limiter and, optionally, with some auth middlewares
 
 Example of usage:
@@ -65,12 +66,8 @@ example of the actual call and response:
 HTTP/1.1 503 Service Unavailable
 Date: Sun, 15 Jul 2018 19:40:31 GMT
 Content-Type: application/json; charset=utf-8
-Content-Length: 36
 
-[
-    {"name":"check1","status":"ok"},
-    {"name":"check2","status":"failed","error":"some error"}
-]
+[{"name":"check1","status":"ok"},{"name":"check2","status":"failed","error":"some error"}]
 ```
 
 _this middleware is pretty basic, but can be used for simple health checks. For more complex cases, like async/cached health checks see [alexliesenfeld/health](https://github.com/alexliesenfeld/health)_
@@ -81,6 +78,7 @@ Logs request, request handling time and response. Log record fields in order of 
 
 - Request's HTTP method
 - Requested URL (with sanitized query)
+- Host
 - Remote IP
 - Response's HTTP status code
 - Response body size
@@ -94,15 +92,40 @@ _remote IP can be masked with user defined function; the provided `logger.Anonym
 
 _request body can be transformed before logging with a user-defined function (`BodyFn`), e.g. to mask credentials. It only runs when body logging is on (`WithBody`), and receives the body along with a `truncated` flag that is set when the body exceeded `MaxBodySize` - the function can use it to emit a marker instead of logging a partial body it can't safely process_
 
-example: `019/03/05 17:26:12.976 [INFO] GET - /api/v1/find?site=remark - 8e228e9cfece - 200 (115) - 4.47784618s`
+example: `2026/11/23 05:36:37 [INFO] REST GET - /api/v1/find?site=remark - api.example.com - 8.8.4.4 - 200 (115) - 4.417µs - user1 - 8e228e9cfece`
+
+The middleware lives in `github.com/go-pkgz/rest/logger`. `logger.Logger` is ready to use with the `REST` prefix, and `logger.New` builds one from options:
+
+```go
+l := logger.New(
+    logger.Prefix("[INFO] REST"),
+    logger.WithBody,
+    logger.MaxBodySize(2048),
+    logger.IPfn(logger.AnonymizeIP),
+)
+router.Use(l.Handler)
+```
+
+Options:
+- `Log(backend)` - sets the `logger.Backend` (anything with `Logf(format string, args ...any)`), the standard `log` package by default
+- `Prefix(prefix)` - text at the start of every line, empty by default
+- `WithBody` - logs the request body
+- `MaxBodySize(n)` - the logged part of the body, 1024 bytes by default
+- `IPfn(fn)` - transforms the remote IP, i.e. `logger.AnonymizeIP`
+- `UserFn(fn)` and `SubjFn(fn)` - add the user and the request subject
+- `BodyFn(fn)` - transforms the logged body, see above
+- `ApacheCombined` - writes the Apache Combined Log Format, which has no prefix, subject, request ID or body
+
+The query values of `password`, `passwd`, `secret`, `credentials` and `token` are logged as `********`. Only these exact names are masked, in any letter case; others, such as `access_token` or `api_key`, are logged as sent.
 
 The response writer the logger hands to the next handler offers `Flush` and `Hijack` only when the writer beneath it does, and exposes that writer to `http.ResponseController` through `Unwrap`.
 
 ### Recoverer middleware
 
-Recoverer is a middleware that recovers from panics, logs the panic (and a backtrace), 
+`rest.Recoverer(l logger.Backend)` is a middleware that recovers from panics, logs the panic (and a backtrace), 
 and returns an HTTP 500 (Internal Server Error) status if possible. 
 It prevents server crashes in case of panic in one of the controllers.
+The backend must not be nil: with a nil backend the logging call itself panics inside the recovery, so a nil-pointer panic escapes in place of the handler's and no 500 is sent.
 
 `http.ErrAbortHandler` is re-panicked untouched and neither logged nor turned into a 500, as `net/http`
 relies on the sentinel reaching the server to abort the response and close the connection.
@@ -115,14 +138,18 @@ Complete IP rules use semantic address equality (so equivalent IPv6 spellings ma
 and all other rules use literal textual prefix matching.
 The middleware will respond with `StatusForbidden` (403) if the request comes from a different IP. 
 It supports both IPv4 and IPv6 and checks the usual headers like `X-Forwarded-For` and `X-Real-IP` and the remote address.
+Addresses in headers are only taken when they are public (see RealIP), so rules for private, loopback and link-local ranges
+can only match the direct peer's `RemoteAddr`, and only when no header carries a public address: behind a proxy on 127.0.0.1 that sets `X-Real-IP: 192.168.1.5`, the request
+is checked as coming from 127.0.0.1, and `OnlyFrom("192.168.0.0/16")` rejects it. The same applies to `Metrics`.
 
 _Note: headers should be trusted and set by a proxy, otherwise it is possible to spoof them._
 
 ### Metrics middleware
 
-Metrics middleware responds to GET /metrics with list of [expvar](https://golang.org/pkg/expvar/),
+Metrics middleware responds to GET on any path ending in `/metrics`, in any letter case, with list of [expvar](https://golang.org/pkg/expvar/),
 limited to a list of source ips, i.e. `rest.Metrics("127.0.0.1", "192.168.0.0/16")`.
 Called without any ip, as `rest.Metrics()`, it rejects every request.
+Because of the suffix match, an application route such as `/api/v1/metrics` behind it is answered by the middleware instead.
 
 To serve the endpoint to everyone, ask for it explicitly with `rest.MetricsAllowAll()`. Note that expvar
 publishes `cmdline`, which usually carries the flag values the process was started with, so only do this
@@ -131,9 +158,17 @@ where something else already keeps the endpoint private.
 ### BlackWords middleware
 
 BlackWords middleware doesn't allow user-defined words in the request body.
+A body containing one of the words, compared case-insensitively, gets `StatusForbidden` (403) with a JSON error.
+`rest.BlackWordsFn(fn)` takes the list from a function, which is called once, when the middleware is created;
+a list it would return later is not used.
 It reads the whole body to inspect it and responds with `StatusBadRequest` (400) if the body can't be read.
 The body is not capped on its own, so put `SizeLimit` in front of it to bound what a request can allocate:
 `rest.Wrap(handler, rest.SizeLimit(1024*1024), rest.BlackWords("word1", "word2"))`.
+
+### Throttle middleware
+
+Limits the number of requests handled at the same time: with `rest.Throttle(100)`, a request arriving while 100
+are in flight gets `StatusServiceUnavailable` (503). A limit of 0 or less disables it.
 
 ### SizeLimit middleware
 
@@ -147,12 +182,17 @@ and added to the request's context, where handlers read it with `rest.GetTraceID
 
 ### Deprecation middleware
 
-Adds the HTTP Deprecation response header, see [draft-ietf-httpapi-deprecation-header-02](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-deprecation-header-02) 
+`rest.Deprecation(version, date)` adds the HTTP Deprecation response header in the format of
+[draft-dalal-deprecation-header-00](https://tools.ietf.org/id/draft-dalal-deprecation-header-00.html),
+i.e. `Deprecation: version="v1", date="2026-01-02T03:04:05Z"`. This format predates
+[RFC 9745](https://www.rfc-editor.org/rfc/rfc9745), whose header carries a date only, so clients written for the RFC
+will not parse it.
 
 ### BasicAuth middleware
 
 BasicAuth middleware requires basic auth and matches user & passwd with client-provided checker. In case if no basic auth headers returns
-`StatusUnauthorized`, in case if checker failed - `StatusForbidden`
+`StatusUnauthorized`, in case if checker failed - `StatusForbidden`. The prompt variants answer `StatusUnauthorized` in both cases,
+see [BasicAuth middleware family](#basicauth-middleware-family).
 
 ### Rewrite middleware
 
@@ -170,7 +210,7 @@ router.Use(rest.CleanPath)
 
 ### StripSlashes middleware
 
-Removes trailing slashes from URL path. For example, `/users/` becomes `/users`. The root path `/` is preserved.
+Removes one trailing slash from URL path. For example, `/users/` becomes `/users`, and `/users//` becomes `/users/`. The root path `/` is preserved.
 
 ```go
 router.Use(rest.StripSlashes)
@@ -178,12 +218,17 @@ router.Use(rest.StripSlashes)
 
 ### NoCache middleware
 
-Sets a number of HTTP headers to prevent a router (handler's) response from being cached by an upstream proxy and/or client.
+Sets a number of HTTP headers to prevent a router (handler's) response from being cached by an upstream proxy and/or client:
+`Expires` (the Unix epoch), `Cache-Control: no-cache, no-store, no-transform, must-revalidate, private, max-age=0`,
+`Pragma: no-cache` and `X-Accel-Expires: 0`. It also removes `ETag` and the conditional headers (`If-None-Match`,
+`If-Modified-Since`, `If-Match`, `If-Unmodified-Since`, `If-Range`) from the request, so a handler that respects them, such as `http.ServeContent`, answers neither 304 Not Modified nor 412 Precondition Failed.
 
 ### CacheControl middleware
 
-Sets `Cache-Control` with the given expiration and an `Etag` derived from the request URL plus a version,
+Sets `Cache-Control: max-age=N, no-cache`, with N the given expiration in seconds, and an `Etag` derived from the request URL plus a version,
 either a fixed string (`CacheControl`) or one computed per request (`CacheControlDynamic`).
+`no-cache` makes every cache revalidate a stored response before using it, so the expiration never lets a response be
+reused unchecked; the gain is the `StatusNotModified` (304) answer to a matching `If-None-Match` described below.
 
 ```go
 router.Use(rest.CacheControl(time.Hour, "v1"))
@@ -238,6 +283,8 @@ RealIP is a middleware that sets a http.Request's RemoteAddr to the results of p
 
 Only public IPs are accepted from headers; private/loopback/link-local IPs are skipped. This makes the middleware compatible with CDN setups like Cloudflare where the leftmost IP in `X-Forwarded-For` is the actual client.
 
+The headers are read from any peer, nothing checks that the request came through a trusted proxy. This middleware should only be used if user can trust the headers sent with request: without a reverse proxy, or behind one that passes along header values from the client, a malicious client can set any of these headers and spoof its IP address, which also defeats `OnlyFrom`. The proxy must overwrite all three headers, `X-Real-IP`, `CF-Connecting-IP` and `X-Forwarded-For`, not only the one it uses: when it puts a private address in `X-Real-IP`, that header is skipped, and a client-supplied `X-Forwarded-For` it left in place wins.
+
 ### Timeout middleware
 
 Timeout bounds a request to the given duration and responds with `StatusGatewayTimeout` (504) at the deadline if the handler has not finished — even for a handler that does not observe the context. The handler runs with a context deadline and its output is buffered; on success the buffered response is written through unchanged, and if the deadline fires first the buffered output is discarded, a 504 is sent, and further writes by the still-running handler return `http.ErrHandlerTimeout`. Because the response is buffered, `http.Flusher` and `http.Hijacker` are not available under `Timeout` (as with `net/http.TimeoutHandler`), so it is not suitable for streaming or connection-hijacking handlers. A non-positive duration disables the middleware (the handler is called directly).
@@ -277,7 +324,7 @@ Features:
 - Origin validation with case-insensitive matching
 - Credentials support (reflects the request origin instead of `*`)
 - Configurable cache duration for preflight results
-- Cache-correct `Vary` headers (adds `Access-Control-Request-Method` and `Access-Control-Request-Headers` on preflight)
+- Cache-correct `Vary` headers (`Vary: Origin` on every response, including one without `Origin` or for a disallowed origin, plus `Access-Control-Request-Method` and `Access-Control-Request-Headers` on preflight). They are added to the response headers, so a handler that replaces `Vary` with `Header().Set` drops them, and so does a `Timeout` placed inside `CORS` when the handlers behind it set `Vary`, as `Gzip` does
 
 Available options:
 - `CorsAllowedOrigins(origins...)` - allowed origins (default: `*`), can't include `*` with credentials enabled
@@ -352,14 +399,24 @@ Available options:
 
 ### CSRF middleware
 
-Provides Cross-Site Request Forgery protection using modern browser Fetch metadata headers (`Sec-Fetch-Site`, `Origin`). For Go 1.25+, this wraps the stdlib's `http.CrossOriginProtection`. For earlier versions, a compatible custom implementation is used.
+Provides Cross-Site Request Forgery protection using modern browser Fetch metadata headers (`Sec-Fetch-Site`, `Origin`).
+The implementation is chosen by the version of the Go toolchain that builds the program, not by `go.mod`: a Go 1.25 or
+newer toolchain wraps the stdlib's `http.CrossOriginProtection`, an older one uses a custom implementation.
+The two differ in bypass patterns. On Go 1.25+ `AddBypassPattern` takes `http.ServeMux` patterns, such as
+`"POST /hooks/github"` or `"/api/{id}/callback"`, and panics when a pattern conflicts with one added before, as adding
+`"/oauth/"` twice does. Before Go 1.25 only exact paths and prefixes ending in `/`, such as `"/oauth/"`, are matched,
+and a repeated pattern is accepted.
+
+Basic protection:
 
 ```go
-// basic protection
 protection := rest.NewCrossOriginProtection()
 router.Use(protection.Handler)
+```
 
-// with trusted origins for cross-origin requests
+With trusted origins for cross-origin requests:
+
+```go
 protection := rest.NewCrossOriginProtection()
 if err := protection.AddTrustedOrigin("https://mobile.example.com"); err != nil {
     log.Fatal(err)
@@ -368,14 +425,20 @@ if err := protection.AddTrustedOrigin("https://admin.example.com"); err != nil {
     log.Fatal(err)
 }
 router.Use(protection.Handler)
+```
 
-// with bypass patterns for webhooks or OAuth
+With bypass patterns for webhooks or OAuth:
+
+```go
 protection := rest.NewCrossOriginProtection()
 protection.AddBypassPattern("/api/webhook")
 protection.AddBypassPattern("/oauth/")
 router.Use(protection.Handler)
+```
 
-// with custom deny handler
+With custom deny handler:
+
+```go
 protection := rest.NewCrossOriginProtection()
 protection.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
     http.Error(w, "CSRF validation failed", http.StatusForbidden)
@@ -392,9 +455,9 @@ How it works:
 Available methods:
 - `NewCrossOriginProtection()` - creates new CSRF protection middleware
 - `AddTrustedOrigin(origin)` - adds origin allowed for cross-origin requests (format: "scheme://host[:port]")
-- `AddBypassPattern(pattern)` - adds URL pattern that bypasses protection (for webhooks, OAuth, etc.)
+- `AddBypassPattern(pattern)` - adds URL pattern that bypasses protection (for webhooks, OAuth, etc.), see above for the pattern syntax
 - `SetDenyHandler(handler)` - sets custom handler for rejected requests (default: 403 Forbidden)
-- `Check(request)` - manually validates a request, returns error if blocked
+- `Check(request)` - manually validates a request, returns error if blocked; the deny handler is not called
 - `Handler(handler)` - wraps an http.Handler with CSRF protection
 
 ### Maybe middleware
@@ -428,7 +491,9 @@ The package provides several BasicAuth middleware implementations for different 
 The base middleware that requires basic auth and matches user & passwd with a client-provided checker function.
 ```go
 checkFn := func(user, passwd string) bool {
-    return user == "admin" && passwd == "secret"
+    matchUser := subtle.ConstantTimeCompare([]byte(user), []byte("admin")) == 1
+    matchPass := subtle.ConstantTimeCompare([]byte(passwd), []byte("secret")) == 1
+    return matchUser && matchPass
 }
 router.Use(rest.BasicAuth(checkFn))
 ```
@@ -465,28 +530,48 @@ Similar to BasicAuthWithUserPasswd but adds browser's authentication prompt by s
 router.Use(rest.BasicAuthWithPrompt("admin", "secret"))
 ```
 
-All BasicAuth middlewares:
+#### BasicAuthWithBcryptHashAndPrompt
+Similar to BasicAuthWithBcryptHash but adds browser's authentication prompt by setting the WWW-Authenticate header.
+```go
+hash, err := rest.GenerateBcryptHash("secret")
+if err != nil {
+    // handle error
+}
+router.Use(rest.BasicAuthWithBcryptHashAndPrompt("admin", hash))
+```
+
+`BasicAuth`, `BasicAuthWithUserPasswd`, `BasicAuthWithBcryptHash` and `BasicAuthWithArgon2Hash`:
 - Return `StatusUnauthorized` (401) if no auth header provided
 - Return `StatusForbidden` (403) if credentials check failed
-- Add IsAuthorized flag to the request context, retrievable with `rest.IsAuthorized(r.Context())`
-- Use constant-time comparison to prevent timing attacks
-- Support secure password hashing with bcrypt and Argon2id
+
+`BasicAuthWithPrompt` and `BasicAuthWithBcryptHashAndPrompt` return `StatusUnauthorized` (401) with
+`WWW-Authenticate: Basic realm="restricted", charset="UTF-8"` in both cases, so the browser asks for credentials again.
+
+All BasicAuth middlewares add IsAuthorized flag to the request context, retrievable with `rest.IsAuthorized(r.Context())`.
+
+The provided checkers compare with `subtle.ConstantTimeCompare`, and the hashed variants compute the hash for a wrong user name too,
+so a wrong user name takes as long to reject as a wrong password. With `BasicAuth`, the checker is yours and should do the same.
 
 ### Benchmarks middleware
 
 Benchmarks middleware allows measuring the time of request handling, number of requests per second and report aggregated metrics. 
-This middleware keeps track of the request in the memory and keep up to 900 points (15 minutes, data-point per second).
+This middleware keeps track of the request in the memory, one data point per second for the last 15 minutes by default;
+`rest.NewBenchmarks().WithTimeRange(d)` keeps `d` instead.
 
 To retrieve the data user should call `Stats(d duration)` method. 
 The `duration` is the time window for which the benchmark data should be returned. 
-It can be any duration from 1s to 15m. Note: all the time data is in microseconds.
+It can be any duration from 1s to the kept time range. Note: all the time data is in microseconds.
+
+`RequestsSec` is the number of requests divided by the time between the first and the last second that had requests in
+the window (at least one second), so it is the rate while requests were coming, not an average over the whole window:
+60 requests in a single second give 60 for a one-minute window.
 
 example with chi router:
 
 ```go
     router := chi.NewRouter()
-	bench = rest.NewBenchmarks()
-	router.Use(bench.Middleware)
+	bench := rest.NewBenchmarks()
+	router.Use(bench.Handler)
 	...
 	router.Get("/bench", func(w http.ResponseWriter, r *http.Request) {
         resp := struct {
@@ -498,22 +583,22 @@ example with chi router:
             bench.Stats(time.Minute * 5),
             bench.Stats(time.Minute * 15),
         }
-        render.JSON(w, r, resp) 		
+        rest.RenderJSON(w, resp)
     })
 ```
 
 ## Helpers
 
-- `rest.Wrap` - converts a list of middlewares to nested handlers calls (in reverse order)
+- `rest.Wrap` - converts a list of middlewares to nested handlers calls; the first middleware listed is the outermost and runs first
 - `rest.JSON` - map alias, just for convenience `type JSON map[string]interface{}`
 - `rest.RenderJSON` -  renders json response from `interface{}`
 - `rest.RenderJSONFromBytes` - renders json response from `[]byte`
 - `rest.RenderJSONWithHTML` -  renders json response with html tags and forced `charset=utf-8`
-- `rest.SendErrorJSON` - makes `{error: blah, details: blah}` json body and responds with given error code. Also, adds context to the logged message
+- `rest.SendErrorJSON` - sends `{"error": msg}` with the given status code and, when given a logger backend, logs `err`, the request and the caller; `err` is never sent to the client
 - `rest.NewErrorLogger` - creates a struct providing shorter form of logger call
-- `rest.FileServer` - creates a file server for static assets with directory listing disabled
+- `rest.NewFileServer(public, local, options...)` - creates a file server for static assets from the `local` directory under the `public` URL prefix, with directory listing disabled by default. Options: `rest.FsOptSPA` serves `/index.html` for a missing file, `rest.FsOptListing` turns directory listing on, `rest.FsOptCustom404(reader)` serves a custom 404 page, which is not used when listing is on. `rest.FileServer` and `rest.FileServerSPA` are deprecated shortcuts for it
 - `realip.Get` - returns client's IP address
-- `rest.ParseFromTo` - parses "from" and "to" request's query params with various formats
+- `rest.ParseFromTo` - parses the "from" and "to" query params of the request, both required, in one of the formats `2006-01-02T15:04:05.000000000`, `2006-01-02T15:04:05`, `2006-01-02T15:04`, `20060102` or RFC 3339; values without a zone are UTC
 - `rest.DecodeJSON` - decodes request body to the provided struct
 - `rest.EncodeJSON` - encodes response body from the provided struct, sets `Content-Type` to `application/json` and sends the status code. The value is encoded before anything is written, so an encoding failure leaves the response uncommitted and the caller can still replace it with an error status. Write failures are reported too, by which point the response has already been committed
 
@@ -522,14 +607,11 @@ example with chi router:
 Profiler is a convenient sub-router used for mounting net/http/pprof, i.e.
 
 ```go
- func MyService() http.Handler {
-   r := chi.NewRouter()
-   // ..middlewares
-   r.Mount("/debug", middleware.Profiler())
-   // ..routes
-   return r
- }
+mux := http.NewServeMux()
+mux.Handle("/debug/", http.StripPrefix("/debug", rest.Profiler("127.0.0.1")))
 ```
+
+The handler expects paths starting at `/pprof/` and `/vars`, so mount it with the prefix stripped. The index is then at `/debug/pprof/`, with the trailing slash: a request for `/debug/pprof` is redirected to `/pprof/`, outside the mount.
 
 It exposes a bunch of `/pprof/*` endpoints as well as `/vars`. Builtin support for `onlyIps` allows restricting access, which is important if it runs on a publicly exposed port.
 Called without any address, `rest.Profiler()` rejects every request, as `rest.Metrics()` does: `/pprof/cmdline` and `/vars` publish the command line, which usually carries the flag values the process was started with.

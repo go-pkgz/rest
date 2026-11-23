@@ -12,13 +12,12 @@ import (
 
 // Profiler is a convenient subrouter used for mounting net/http/pprof. ie.
 //
-//	func MyService() http.Handler {
-//	  r := chi.NewRouter()
-//	  // ..middlewares
-//	  r.Mount("/debug", middleware.Profiler())
-//	  // ..routes
-//	  return r
-//	}
+//	mux := http.NewServeMux()
+//	mux.Handle("/debug/", http.StripPrefix("/debug", rest.Profiler("127.0.0.1")))
+//
+// The handler expects paths starting at /pprof/ and /vars, so mount it with the prefix stripped. The index is
+// then at /debug/pprof/, with the trailing slash: a request for /debug/pprof is redirected to /pprof/,
+// outside the mount.
 //
 // Access is limited to the given source addresses, in any form OnlyFrom takes. Called without any, it
 // rejects every request, as Metrics does, since /pprof/cmdline and /vars publish the command line.

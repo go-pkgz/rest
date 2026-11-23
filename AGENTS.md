@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents working with code in this repository.
 
 ## What this is
 
@@ -11,18 +11,17 @@ Dependencies are deliberately tiny: only `stretchr/testify` (tests) and `golang.
 ## Commands
 
 - Test everything: `go test ./...`
-- Single test: `go test -run TestName ./...` (e.g. `go test -run TestPing ./...`)
+- Single test: `go test -run TestName ./...` (e.g. `go test -run TestMiddleware_Ping ./...`)
 - Race + coverage (mirrors CI): `TZ="America/Chicago" go test -timeout=60s -race -covermode=atomic ./...`
 - Lint (run from repo root): `golangci-lint run --max-issues-per-linter=0 --max-same-issues=0`
 
-Time-parsing tests (`ParseFromTo`) are timezone-sensitive; CI runs with `TZ=America/Chicago`. Set it locally if a from/to test behaves oddly.
-
 ## Architecture
 
-Three packages:
+Three public packages and one internal:
 - **`rest`** (root) — all middlewares plus JSON/error/file-server helpers.
 - **`logger`** — request-logging middleware, split out so it can be wired to any backend via the `logger.Backend` interface (`Logf(format, args...)`). Configured with functional options (`logger.New(logger.Prefix(...), logger.WithBody, ...)`).
 - **`realip`** — `realip.Get(r)` extracts the client IP from proxy headers. Used by both `rest.RealIP` and the `logger` package. Only public IPs are accepted from headers.
+- **`internal/requestid`**: the request ID that `Trace` keeps in the request context, shared with the `logger` package, which can't import `rest` because `rest` imports it.
 
 ### Middleware conventions
 
@@ -41,11 +40,11 @@ CSRF protection has **two implementations behind one identical public API**, sel
 - `csrf_go125.go` (`//go:build go1.25`) — thin wrapper over stdlib `http.CrossOriginProtection`.
 - `csrf.go` (`//go:build !go1.25`) — self-contained equivalent for older Go.
 
-`NewCrossOriginProtection`, `AddTrustedOrigin`, `AddBypassPattern`, `SetDenyHandler`, `Check`, `Handler` must exist with the **same signatures and behavior in both files**. When you change the CSRF API or behavior, edit both files and keep `csrf_test.go` passing under both build tags. go.mod targets go 1.24, so by default the `!go1.25` path compiles unless building with a 1.25 toolchain.
+`NewCrossOriginProtection`, `AddTrustedOrigin`, `AddBypassPattern`, `SetDenyHandler`, `Check`, `Handler` must exist with the **same signatures in both files**. When you change the CSRF API or behavior, edit both files and keep `csrf_test.go` passing under both build tags. The toolchain's version selects the file, not go.mod: any 1.25+ toolchain builds `csrf_go125.go`, and only a 1.24 toolchain (the `go.mod` entry of the CI matrix) builds `csrf.go`. The two differ in bypass-pattern syntax and conflict handling: the stdlib takes `http.ServeMux` patterns and panics on a conflicting one, the fallback matches exact paths and `/prefix/` only and accepts repeats. Run the tests with `GOTOOLCHAIN=go1.24.0` too when touching either file.
 
 ### Helpers
 
-`rest.go` holds the JSON render/encode/decode helpers (`RenderJSON`, `EncodeJSON`/`DecodeJSON` generics, `RenderJSONWithHTML`) and `ParseFromTo`. `httperrors.go` has `SendErrorJSON`/`NewErrorLogger`. `file_server.go` has `FileServer` (directory listing disabled by design). `benchmarks.go` keeps an in-memory ring of up to 900 per-second data points (15 min) queried via `Stats(duration)`.
+`rest.go` holds the JSON render/encode/decode helpers (`RenderJSON`, `EncodeJSON`/`DecodeJSON` generics, `RenderJSONWithHTML`) and `ParseFromTo`. `httperrors.go` has `SendErrorJSON`/`NewErrorLogger`. `file_server.go` has `NewFileServer` with `FsOpt*` options (`FsOptSPA`, `FsOptListing`, `FsOptCustom404`), listing off by default; `FileServer` and `FileServerSPA` are deprecated shortcuts. `benchmarks.go` keeps in memory one data point per second for the last 15 minutes by default (`WithTimeRange` changes it), queried via `Stats(duration)`.
 
 ## Conventions
 
