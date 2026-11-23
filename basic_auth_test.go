@@ -444,3 +444,38 @@ func TestBasicAuthWithBcryptHashAndPrompt(t *testing.T) {
 		})
 	}
 }
+
+func TestBasicAuthHashedWrongUserStillHashes(t *testing.T) {
+	bcryptHash, err := GenerateBcryptHash("good")
+	require.NoError(t, err)
+	argonHash, argonSalt, err := GenerateArgon2Hash("good")
+	require.NoError(t, err)
+
+	tbl := []struct {
+		name   string
+		mw     func(http.Handler) http.Handler
+		status int
+	}{
+		{name: "bcrypt", mw: BasicAuthWithBcryptHash("dev", bcryptHash), status: http.StatusForbidden},
+		{name: "bcrypt with prompt", mw: BasicAuthWithBcryptHashAndPrompt("dev", bcryptHash), status: http.StatusUnauthorized},
+		{name: "argon2", mw: BasicAuthWithArgon2Hash("dev", argonHash, argonSalt), status: http.StatusForbidden},
+	}
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			h := tt.mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+			// a wrong user name must cost a hash comparison too, otherwise the response time tells valid
+			// user names apart; only a lower bound is checked, as a loaded machine can only make it slower
+			fastest := time.Duration(1<<63 - 1)
+			for range 3 {
+				req := httptest.NewRequest("GET", "/something", http.NoBody)
+				req.SetBasicAuth("wrong", "good")
+				rr := httptest.NewRecorder()
+				st := time.Now()
+				h.ServeHTTP(rr, req)
+				fastest = min(fastest, time.Since(st))
+				assert.Equal(t, tt.status, rr.Code)
+			}
+			assert.GreaterOrEqual(t, fastest, time.Millisecond, "wrong user answered without hashing")
+		})
+	}
+}

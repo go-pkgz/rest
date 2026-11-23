@@ -101,3 +101,13 @@ func TestThrottleDisabled(t *testing.T) {
 	assert.Equal(t, int32(100), atomic.LoadInt32(&okStatus))
 	assert.Equal(t, int32(0), atomic.LoadInt32(&badStatus))
 }
+
+func TestThrottleNegativeLimit(t *testing.T) {
+	var mw func(http.Handler) http.Handler
+	require.NotPanics(t, func() { mw = Throttle(-1) })
+
+	req := httptest.NewRequest("GET", "/", http.NoBody)
+	rr := httptest.NewRecorder()
+	mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })).ServeHTTP(rr, req)
+	assert.Equal(t, http.StatusOK, rr.Code)
+}

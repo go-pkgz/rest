@@ -3,6 +3,7 @@ package rest
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -50,18 +51,24 @@ func errDetailsMsg(r *http.Request, code int, err error, msg string) string {
 
 	srcFileInfo := ""
 	if pc, file, line, ok := runtime.Caller(2); ok {
-		fnameElems := strings.Split(file, "/")
 		funcNameElems := strings.Split(runtime.FuncForPC(pc).Name(), "/")
-		srcFileInfo = fmt.Sprintf(" [caused by %s:%d %s]", strings.Join(fnameElems[len(fnameElems)-3:], "/"),
-			line, funcNameElems[len(funcNameElems)-1])
+		srcFileInfo = fmt.Sprintf(" [caused by %s:%d %s]", shortCallerPath(file), line, funcNameElems[len(funcNameElems)-1])
 	}
 
+	// RemoteAddr is host:port as set by the server, or a bare address once RealIP has rewritten it
 	remoteIP := r.RemoteAddr
-	if pos := strings.Index(remoteIP, ":"); pos >= 0 {
-		remoteIP = remoteIP[:pos]
+	if host, _, splitErr := net.SplitHostPort(remoteIP); splitErr == nil {
+		remoteIP = host
 	}
 	if err == nil {
 		err = errors.New("no error")
 	}
 	return fmt.Sprintf("%s - %v - %d - %s - %s%s", msg, err, code, remoteIP, q, srcFileInfo)
+}
+
+// shortCallerPath keeps the last three elements of the caller's file path, or all of them if there are fewer,
+// as for a file in the root of a single-element module built with -trimpath
+func shortCallerPath(file string) string {
+	elems := strings.Split(file, "/")
+	return strings.Join(elems[max(0, len(elems)-3):], "/")
 }

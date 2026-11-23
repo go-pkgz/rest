@@ -408,3 +408,41 @@ func TestCORS_UnsafeAnyOriginWithCredentials(t *testing.T) {
 		assert.Empty(t, resp.Header.Get("Access-Control-Allow-Credentials"))
 	})
 }
+
+func TestCORS_VaryOriginOnEveryResponse(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	listed := CORS(CorsAllowedOrigins("https://allowed.com"))
+	anyWithCredentials := CORS(CorsAllowedOrigins("*"), CorsAllowCredentials(true), CorsUnsafeAnyOriginWithCredentials(true))
+
+	tbl := []struct {
+		name   string
+		mw     func(http.Handler) http.Handler
+		origin string
+		vary   []string
+	}{
+		{name: "listed, allowed origin", mw: listed, origin: "https://allowed.com", vary: []string{"Origin"}},
+		{name: "listed, disallowed origin", mw: listed, origin: "https://evil.com", vary: []string{"Origin"}},
+		{name: "listed, no origin", mw: listed, origin: "", vary: []string{"Origin"}},
+		{name: "any with credentials, no origin", mw: anyWithCredentials, origin: "", vary: []string{"Origin"}},
+		{name: "any with credentials, origin", mw: anyWithCredentials, origin: "https://x.com", vary: []string{"Origin"}},
+		// with "*" the response to a request with Origin carries Access-Control-Allow-Origin and the one
+		// without does not, so caches have to key on Origin here too
+		{name: "any, no origin", mw: CORS(), origin: "", vary: []string{"Origin"}},
+		{name: "any, origin", mw: CORS(), origin: "https://x.com", vary: []string{"Origin"}},
+	}
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/test", http.NoBody)
+			if tt.origin != "" {
+				req.Header.Set("Origin", tt.origin)
+			}
+			w := httptest.NewRecorder()
+			tt.mw(handler).ServeHTTP(w, req)
+			resp := w.Result()
+			defer resp.Body.Close()
+			assert.Equal(t, tt.vary, resp.Header.Values("Vary"))
+		})
+	}
+}

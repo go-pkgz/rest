@@ -24,6 +24,7 @@ func TestNoCache(t *testing.T) {
 	require.NoError(t, err)
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, "Thu, 01 Jan 1970 00:00:00 UTC", rr.Header().Get("Expires"))
+	assert.Equal(t, "Thu, 01 Jan 1970 00:00:00 GMT", rr.Header().Get("Expires"))
+	assert.Equal(t, "no-cache, no-store, no-transform, must-revalidate, private, max-age=0", rr.Header().Get("Cache-Control"))
 	assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
 }

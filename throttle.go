@@ -4,10 +4,14 @@ import (
 	"net/http"
 )
 
-// Throttle middleware checks how many request in-fly and rejects with 503 if exceeded
+// Throttle middleware checks how many request in-fly and rejects with 503 if exceeded.
+// A limit of 0 or less disables it.
 func Throttle(limit int64) func(http.Handler) http.Handler {
 
-	ch := make(chan struct{}, limit)
+	var ch chan struct{}
+	if limit > 0 {
+		ch = make(chan struct{}, limit)
+	}
 	return func(h http.Handler) http.Handler {
 
 		fn := func(w http.ResponseWriter, r *http.Request) {

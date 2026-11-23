@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime/pprof"
 	"strings"
 	"testing"
 
@@ -117,4 +118,54 @@ func TestProfiler_AllowedIP(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestProfiler_AllocsAndMutex(t *testing.T) {
+	ts := httptest.NewServer(Profiler())
+	defer ts.Close()
+
+	tbl := []struct {
+		path, prefix string
+	}{
+		{path: "/pprof/allocs?debug=1", prefix: "heap profile:"},
+		{path: "/pprof/mutex?debug=1", prefix: "--- mutex:"},
+	}
+	for _, tt := range tbl {
+		t.Run(tt.path, func(t *testing.T) {
+			resp, err := http.Get(ts.URL + tt.path)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			assert.True(t, strings.HasPrefix(string(body), tt.prefix), "got %q", firstLine(string(body)))
+		})
+	}
+}
+
+func firstLine(s string) string {
+	line, _, _ := strings.Cut(s, "\n")
+	return line
+}
+
+func TestProfiler_AnyNamedProfile(t *testing.T) {
+	const name = "rest_test_custom_profile"
+	if pprof.Lookup(name) == nil {
+		pprof.NewProfile(name)
+	}
+	ts := httptest.NewServer(Profiler("127.0.0.1"))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/pprof/" + name + "?debug=1")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(string(body), name+" profile:"), "got %q", firstLine(string(body)))
+
+	resp, err = http.Get(ts.URL + "/pprof/no_such_profile")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }

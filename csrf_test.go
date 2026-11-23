@@ -322,3 +322,18 @@ func TestCSRF_Integration(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 }
+
+func TestCSRF_CheckDoesNotCallDenyHandler(t *testing.T) {
+	protection := NewCrossOriginProtection()
+	denyCalls := 0
+	protection.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		denyCalls++
+		w.WriteHeader(http.StatusTeapot)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/data", http.NoBody)
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+
+	require.Error(t, protection.Check(req))
+	assert.Equal(t, 0, denyCalls, "Check must only report, the deny handler belongs to Handler")
+}

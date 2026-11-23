@@ -64,30 +64,9 @@ func (c *CrossOriginProtection) SetDenyHandler(h http.Handler) {
 
 // Check validates a request against CSRF protection rules.
 // Returns nil if the request is allowed, or an error describing why it was rejected.
+// It only reports the result; the deny handler is used by Handler alone.
 func (c *CrossOriginProtection) Check(r *http.Request) error {
-	// the stdlib Check method panics or returns void, so we use our own check logic
-	// by creating a test handler and seeing if it gets called
-
-	// safe methods are always allowed
-	switch r.Method {
-	case http.MethodGet, http.MethodHead, http.MethodOptions:
-		return nil
-	}
-
-	// use a test to determine if request would be allowed
-	allowed := false
-	testHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		allowed = true
-	})
-
-	// create a response recorder to capture the result
-	rec := &discardResponseWriter{}
-	c.stdlib.Handler(testHandler).ServeHTTP(rec, r)
-
-	if !allowed {
-		return fmt.Errorf("cross-origin request blocked by CSRF protection")
-	}
-	return nil
+	return c.stdlib.Check(r)
 }
 
 // Handler wraps an http.Handler with CSRF protection.
@@ -95,17 +74,3 @@ func (c *CrossOriginProtection) Check(r *http.Request) error {
 func (c *CrossOriginProtection) Handler(h http.Handler) http.Handler {
 	return c.stdlib.Handler(h)
 }
-
-// discardResponseWriter is a minimal ResponseWriter for testing.
-type discardResponseWriter struct {
-	header http.Header
-}
-
-func (d *discardResponseWriter) Header() http.Header {
-	if d.header == nil {
-		d.header = make(http.Header)
-	}
-	return d.header
-}
-func (d *discardResponseWriter) Write(b []byte) (int, error) { return len(b), nil }
-func (d *discardResponseWriter) WriteHeader(_ int)           {}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/pprof"
+	"strings"
 )
 
 // Profiler is a convenient subrouter used for mounting net/http/pprof. ie.
@@ -18,18 +19,24 @@ import (
 //	}
 func Profiler(onlyIps ...string) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/pprof/", pprof.Index)
+	mux.HandleFunc("/pprof/", pprofByName)
 	mux.HandleFunc("/pprof/cmdline", pprof.Cmdline)
 	mux.HandleFunc("/pprof/profile", pprof.Profile)
 	mux.HandleFunc("/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/pprof/trace", pprof.Trace)
-	mux.Handle("/pprof/block", pprof.Handler("block"))
-	mux.Handle("/pprof/heap", pprof.Handler("heap"))
-	mux.Handle("/pprof/goroutine", pprof.Handler("goroutine"))
-	mux.Handle("/pprof/threadcreate", pprof.Handler("threadcreate"))
 	mux.HandleFunc("/vars", expVars)
 
 	return Wrap(mux, NoCache, OnlyFrom(onlyIps...))
+}
+
+// pprofByName serves the index for /pprof/ and the named profile for /pprof/{name}. pprof.Index only
+// resolves names under /debug/pprof/, so with the prefix stripped it would answer every name with the index
+func pprofByName(w http.ResponseWriter, r *http.Request) {
+	if name := strings.TrimPrefix(r.URL.Path, "/pprof/"); name != "" {
+		pprof.Handler(name).ServeHTTP(w, r)
+		return
+	}
+	pprof.Index(w, r)
 }
 
 // expVars copied from stdlib expvar.go as is not public.

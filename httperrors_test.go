@@ -87,3 +87,38 @@ func TestErrorLogger_Log(t *testing.T) {
 
 	t.Log(l.buf.String())
 }
+
+func TestErrorDetailsMsgRemoteAddr(t *testing.T) {
+	tbl := []struct {
+		remoteAddr, want string
+	}{
+		{remoteAddr: "1.2.3.4:5678", want: "1.2.3.4"},
+		{remoteAddr: "1.2.3.4", want: "1.2.3.4"},
+		{remoteAddr: "[2001:db8::1]:1234", want: "2001:db8::1"},
+		{remoteAddr: "2001:db8::1", want: "2001:db8::1"},
+	}
+	for _, tt := range tbl {
+		t.Run(tt.remoteAddr, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/test", http.NoBody)
+			req.RemoteAddr = tt.remoteAddr
+			msg := errDetailsMsg(req, 500, errors.New("error 500"), "details")
+			assert.Contains(t, msg, "details - error 500 - 500 - "+tt.want+" - /test [caused by", msg)
+		})
+	}
+}
+
+func TestShortCallerPath(t *testing.T) {
+	tbl := []struct {
+		file, want string
+	}{
+		{file: "/home/user/go/src/github.com/x/y/handlers.go", want: "x/y/handlers.go"},
+		{file: "github.com/x/y/app/main.go", want: "y/app/main.go"},
+		{file: "app/main.go", want: "app/main.go"}, // root of a single-element module built with -trimpath
+		{file: "main.go", want: "main.go"},
+	}
+	for _, tt := range tbl {
+		t.Run(tt.file, func(t *testing.T) {
+			assert.Equal(t, tt.want, shortCallerPath(tt.file))
+		})
+	}
+}
