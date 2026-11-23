@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"strings"
+
+	"github.com/go-pkgz/rest/realip"
 )
 
 // Profiler is a convenient subrouter used for mounting net/http/pprof. ie.
@@ -17,6 +19,10 @@ import (
 //	  // ..routes
 //	  return r
 //	}
+//
+// Access is limited to the given source addresses, in any form OnlyFrom takes. Called without any, it
+// rejects every request, as Metrics does, since /pprof/cmdline and /vars publish the command line.
+// To serve every source on purpose, list all of them: Profiler("0.0.0.0/0", "::/0").
 func Profiler(onlyIps ...string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/pprof/", pprofByName)
@@ -26,6 +32,9 @@ func Profiler(onlyIps ...string) http.Handler {
 	mux.HandleFunc("/pprof/trace", pprof.Trace)
 	mux.HandleFunc("/vars", expVars)
 
+	if len(onlyIps) == 0 {
+		return Wrap(mux, NoCache, rejectAll)
+	}
 	return Wrap(mux, NoCache, OnlyFrom(onlyIps...))
 }
 
@@ -37,6 +46,17 @@ func pprofByName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pprof.Index(w, r)
+}
+
+// rejectAll answers every request with 403, the way OnlyFrom rejects an address it doesn't list
+func rejectAll(_ http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip, err := realip.Get(r)
+		if err != nil {
+			ip = r.RemoteAddr
+		}
+		_ = EncodeJSON(w, http.StatusForbidden, JSON{"error": fmt.Sprintf("ip %q rejected", ip)})
+	})
 }
 
 // expVars copied from stdlib expvar.go as is not public.

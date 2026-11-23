@@ -9,12 +9,14 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-pkgz/rest/internal/requestid"
 	"github.com/go-pkgz/rest/realip"
 )
 
@@ -44,6 +46,7 @@ type logParts struct {
 	statusCode int
 	respSize   int
 	host       string
+	traceID    string
 
 	prefix string
 	user   string
@@ -117,6 +120,18 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 				remoteIP = l.ipFn(remoteIP)
 			}
 
+			// a request id comes from the client or, when Trace generated one, from the request context
+			// (Trace outside the logger) or the response headers (Trace inside it)
+			traceID := r.Header.Get("X-Request-ID")
+			if traceID == "" {
+				traceID = requestid.From(r.Context())
+			}
+			if traceID == "" {
+				traceID = ww.Header().Get("X-Request-ID")
+			}
+			// the handler can put anything in its response header, keep it on one line like the url and body
+			traceID = lineBreaks.Replace(traceID)
+
 			server := r.URL.Hostname()
 			if server == "" {
 				server = strings.Split(r.Host, ":")[0]
@@ -127,6 +142,7 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 				rawURL:     rawurl,
 				method:     r.Method,
 				host:       server,
+				traceID:    traceID,
 				remoteIP:   remoteIP,
 				statusCode: ww.status,
 				respSize:   ww.size,
@@ -138,7 +154,7 @@ func (l *Middleware) Handler(next http.Handler) http.Handler {
 			l.log.Logf("%s", formater(r, p))
 		}()
 
-		next.ServeHTTP(ww, r)
+		next.ServeHTTP(wrapResponseWriter(ww), r)
 	}
 	return http.HandlerFunc(fn)
 }
@@ -165,9 +181,9 @@ func (l *Middleware) formatDefault(r *http.Request, p *logParts) string {
 		}
 	}
 
-	if traceID := r.Header.Get("X-Request-ID"); traceID != "" {
+	if p.traceID != "" {
 		_, _ = bld.WriteString(" - ")
-		_, _ = bld.WriteString(traceID)
+		_, _ = bld.WriteString(p.traceID)
 	}
 
 	if p.body != "" {
@@ -324,11 +340,33 @@ func (l *Middleware) sanitizeQuery(rawQuery string) string {
 	return query.Encode()
 }
 
-// AnonymizeIP is a function to reset the last part of IPv4 to 0.
-// from 123.212.12.78 it will make 123.212.12.0
+// AnonymizeIP resets the last part of IPv4 to 0 and the low 80 bits of IPv6 to 0,
+// keeping the /48 network: 123.212.12.78 becomes 123.212.12.0, 2001:db8:abcd:12::1 becomes 2001:db8:abcd::.
+// An IPv4 address in IPv6 form keeps its form, ::ffff:808:404 becomes ::ffff:8.8.4.0. A port, square brackets
+// and an IPv6 zone are dropped. A value that is not an IP address is reset after its last dot if it has
+// four dot-separated parts, otherwise returned unchanged.
 func AnonymizeIP(ip string) string {
 	if ip == "" {
 		return ""
+	}
+
+	addr, err := netip.ParseAddr(strings.TrimSuffix(strings.TrimPrefix(ip, "["), "]"))
+	if err != nil {
+		if addrPort, portErr := netip.ParseAddrPort(ip); portErr == nil {
+			addr, err = addrPort.Addr(), nil
+		}
+	}
+	if err == nil {
+		bits := 24 // IPv4
+		switch {
+		case addr.Is4In6():
+			bits = 96 + 24 // the IPv4 part sits in the low 32 bits
+		case addr.Is6():
+			bits = 48
+		}
+		if prefix, prefixErr := addr.Prefix(bits); prefixErr == nil {
+			return prefix.Addr().String()
+		}
 	}
 
 	parts := strings.Split(ip, ".")
@@ -340,11 +378,8 @@ func AnonymizeIP(ip string) string {
 }
 
 // customResponseWriter is an HTTP response logger that keeps HTTP status code and
-// the number of bytes written.
-// It implements http.ResponseWriter, http.Flusher and http.Hijacker.
-// Note that type assertion from http.ResponseWriter(customResponseWriter) to
-// http.Flusher and http.Hijacker is always succeed but underlying http.ResponseWriter
-// may not implement them.
+// the number of bytes written. The handler gets it through wrapResponseWriter, which offers
+// http.Flusher and http.Hijacker only when the writer beneath does.
 type customResponseWriter struct {
 	http.ResponseWriter
 	status int
@@ -371,17 +406,52 @@ func (c *customResponseWriter) Write(b []byte) (int, error) {
 	return size, err
 }
 
-// Flush implements http.Flusher
-func (c *customResponseWriter) Flush() {
-	if f, ok := c.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
+// Unwrap exposes the underlying writer to http.ResponseController
+func (c *customResponseWriter) Unwrap() http.ResponseWriter {
+	return c.ResponseWriter
 }
 
-// Hijack implements http.Hijacker
-func (c *customResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if hj, ok := c.ResponseWriter.(http.Hijacker); ok {
-		return hj.Hijack()
+// the wrapper must offer exactly the optional interfaces the underlying writer has, otherwise a
+// handler's type assertion succeeds and the call then does nothing, which is how a Flush under
+// rest.Timeout (offering neither) would be silently lost
+type flushWriter struct{ *customResponseWriter }
+
+func (w flushWriter) Flush() { w.ResponseWriter.(http.Flusher).Flush() }
+
+// FlushError lets http.ResponseController report a failed flush, which Flush has no way to return
+func (w flushWriter) FlushError() error { return http.NewResponseController(w.ResponseWriter).Flush() }
+
+type hijackWriter struct{ *customResponseWriter }
+
+func (w hijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return w.ResponseWriter.(http.Hijacker).Hijack()
+}
+
+type flushHijackWriter struct{ *customResponseWriter }
+
+func (w flushHijackWriter) Flush() { w.ResponseWriter.(http.Flusher).Flush() }
+
+// FlushError lets http.ResponseController report a failed flush, which Flush has no way to return
+func (w flushHijackWriter) FlushError() error {
+	return http.NewResponseController(w.ResponseWriter).Flush()
+}
+
+func (w flushHijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return w.ResponseWriter.(http.Hijacker).Hijack()
+}
+
+// wrapResponseWriter picks the variant matching the capabilities of the writer underneath
+func wrapResponseWriter(c *customResponseWriter) http.ResponseWriter {
+	_, isFlusher := c.ResponseWriter.(http.Flusher)
+	_, isHijacker := c.ResponseWriter.(http.Hijacker)
+
+	switch {
+	case isFlusher && isHijacker:
+		return flushHijackWriter{c}
+	case isFlusher:
+		return flushWriter{c}
+	case isHijacker:
+		return hijackWriter{c}
 	}
-	return nil, nil, fmt.Errorf("ResponseWriter does not implement the Hijacker interface")
+	return c
 }

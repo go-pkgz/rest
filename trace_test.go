@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/go-pkgz/rest/logger"
 )
 
 func TestTraceNoID(t *testing.T) {
@@ -71,4 +74,34 @@ func TestGetTraceID_NoContext(t *testing.T) {
 	assert.NoError(t, err)
 	traceID := GetTraceID(req)
 	assert.Empty(t, traceID, "trace ID should be empty without Trace middleware")
+}
+
+func TestTraceIDLogged(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+
+	tbl := []struct {
+		name  string
+		build func(l *mockLgr) http.Handler
+	}{
+		{name: "trace outside logger", build: func(l *mockLgr) http.Handler {
+			return Wrap(handler, Trace, logger.New(logger.Log(l)).Handler)
+		}},
+		{name: "trace inside logger", build: func(l *mockLgr) http.Handler {
+			return Wrap(handler, logger.New(logger.Log(l)).Handler, Trace)
+		}},
+		{name: "timeout between trace and logger", build: func(l *mockLgr) http.Handler {
+			// Timeout hands the inner chain its own header map, so the logger can't see Trace's response header
+			return Wrap(handler, Trace, Timeout(time.Minute), logger.New(logger.Log(l)).Handler)
+		}},
+	}
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			l := &mockLgr{}
+			rr := httptest.NewRecorder()
+			tt.build(l).ServeHTTP(rr, httptest.NewRequest("GET", "/something", http.NoBody))
+			id := rr.Header().Get("X-Request-ID")
+			require.NotEmpty(t, id)
+			assert.Contains(t, l.buf.String(), " - "+id, "generated request id is not in the log line")
+		})
+	}
 }

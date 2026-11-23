@@ -407,3 +407,11 @@ type mockLgr struct {
 func (m *mockLgr) Logf(format string, args ...any) {
 	_, _ = m.buf.WriteString(fmt.Sprintf(format+"\n", args...))
 }
+
+func TestHeadersValueWithColon(t *testing.T) {
+	req := httptest.NewRequest("GET", "/something", http.NoBody)
+	h := Headers("X-Upstream: http://10.0.0.1:8080", "X-Empty:")(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+	h.ServeHTTP(httptest.NewRecorder(), req)
+	assert.Equal(t, "http://10.0.0.1:8080", req.Header.Get("X-Upstream"))
+	assert.Equal(t, []string{""}, req.Header.Values("X-Empty"))
+}
