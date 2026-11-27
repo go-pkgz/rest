@@ -63,5 +63,10 @@ func errDetailsMsg(r *http.Request, code int, err error, msg string) string {
 	if err == nil {
 		err = errors.New("no error")
 	}
-	return fmt.Sprintf("%s - %v - %d - %s - %s%s", msg, err, code, remoteIP, q, srcFileInfo)
+	return errLineBreaks.Replace(fmt.Sprintf("%s - %v - %d - %s - %s%s", msg, err, code, remoteIP, q, srcFileInfo))
 }
+
+// errLineBreaks maps every character that can start a new line to a space, the same set the request logger
+// collapses. The request URL is logged unescaped, so an encoded line break in it, or one in the error or the
+// message, would otherwise start a log record written by whoever sent the request.
+var errLineBreaks = strings.NewReplacer("\n", " ", "\r", " ", "\v", " ", "\f", " ", "\u0085", " ", "\u2028", " ", "\u2029", " ")

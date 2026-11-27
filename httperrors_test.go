@@ -87,3 +87,13 @@ func TestErrorLogger_Log(t *testing.T) {
 
 	t.Log(l.buf.String())
 }
+
+func TestErrorDetailsMsgSingleLine(t *testing.T) {
+	req, err := http.NewRequest("GET", "https://example.com/login?user=x%0A2026/11/27%2012:00:00%20[INFO]%20FORGED%0D%0B%0C%C2%85%E2%80%A8%E2%80%A9end",
+		http.NoBody)
+	require.NoError(t, err)
+	req.RemoteAddr = "1.2.3.4:1234"
+	msg := errDetailsMsg(req, 401, errors.New("bad\nuser"), "can't\rlogin")
+	assert.NotRegexp(t, "[\n\r\v\f\u0085\u2028\u2029]", msg, "the record is one line")
+	assert.Contains(t, msg, "can't login - bad user - 401 - 1.2.3.4 - https://example.com/login?user=x 2026/11/27 12:00:00 [INFO] FORGED      end")
+}
