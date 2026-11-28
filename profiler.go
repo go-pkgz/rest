@@ -21,8 +21,23 @@ import (
 //
 // Access is limited to the given source addresses, in any form OnlyFrom takes. Called without any, it
 // rejects every request, as Metrics does, since /pprof/cmdline and /vars publish the command line.
-// To serve every source on purpose, list all of them: Profiler("0.0.0.0/0", "::/0").
+// Use ProfilerAllowAll to serve every source on purpose.
 func Profiler(onlyIps ...string) http.Handler {
+	if len(onlyIps) == 0 {
+		return Wrap(profilerMux(), NoCache, rejectAll)
+	}
+	return Wrap(profilerMux(), NoCache, OnlyFrom(onlyIps...))
+}
+
+// ProfilerAllowAll serves the Profiler routes to any source, without any ip check, so it also serves a Unix
+// socket client, whose address is not an IP. /pprof/cmdline and /vars publish the command line, which usually
+// carries the flag values the process was started with, so only use this where something else already keeps
+// the endpoint private.
+func ProfilerAllowAll() http.Handler {
+	return Wrap(profilerMux(), NoCache)
+}
+
+func profilerMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/pprof/", pprofByName)
 	mux.HandleFunc("/pprof/cmdline", pprof.Cmdline)
@@ -30,11 +45,7 @@ func Profiler(onlyIps ...string) http.Handler {
 	mux.HandleFunc("/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/pprof/trace", pprof.Trace)
 	mux.HandleFunc("/vars", expVars)
-
-	if len(onlyIps) == 0 {
-		return Wrap(mux, NoCache, rejectAll)
-	}
-	return Wrap(mux, NoCache, OnlyFrom(onlyIps...))
+	return mux
 }
 
 // pprofByName serves the index for /pprof/ and the named profile for /pprof/{name}. pprof.Index only

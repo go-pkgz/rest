@@ -205,3 +205,20 @@ func TestProfiler_AnyNamedProfile(t *testing.T) {
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
+
+func TestProfilerAllowAll(t *testing.T) {
+	remotes := []string{"", "@", "[fe80::1%en0]:1234", "8.8.8.8:1234", "[2001:4860:4860::8888]:1234"}
+	for _, remote := range remotes {
+		t.Run("remote "+remote, func(t *testing.T) {
+			for _, path := range []string{"/pprof/", "/pprof/cmdline", "/vars"} {
+				req := httptest.NewRequest("GET", path, http.NoBody)
+				req.RemoteAddr = remote
+				rr := httptest.NewRecorder()
+				ProfilerAllowAll().ServeHTTP(rr, req)
+				assert.Equal(t, http.StatusOK, rr.Code, path)
+				assert.Equal(t, "no-cache, no-store, no-transform, must-revalidate, private, max-age=0",
+					rr.Header().Get("Cache-Control"), path)
+			}
+		})
+	}
+}
