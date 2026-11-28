@@ -217,9 +217,9 @@ func TestHeaders(t *testing.T) {
 }
 
 func TestMaybe(t *testing.T) {
-	var count int32
+	var count atomic.Int32
 	h := Maybe(Headers("h1:v1", "bad", "h2:v2"), func(*http.Request) bool {
-		return atomic.AddInt32(&count, 1) == 1
+		return count.Add(1) == 1
 	})(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 
 	{

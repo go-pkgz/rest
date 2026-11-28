@@ -15,9 +15,9 @@ import (
 func TestThrottle(t *testing.T) {
 
 	thrMw := Throttle(10)
-	var calls int32
+	var calls atomic.Int32
 	ts := httptest.NewServer(thrMw(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt32(&calls, 1)
+		calls.Add(1)
 		time.Sleep(200 * time.Millisecond)
 	})))
 	defer ts.Close()
@@ -52,7 +52,7 @@ func TestThrottle(t *testing.T) {
 	require.NoError(t, err)
 	_ = resp.Body.Close()
 
-	assert.Equal(t, int32(12), atomic.LoadInt32(&calls))
+	assert.Equal(t, int32(12), calls.Load())
 	assert.Equal(t, int32(10), atomic.LoadInt32(&okStatus))
 	assert.Equal(t, int32(90), atomic.LoadInt32(&badStatus))
 }
@@ -60,9 +60,9 @@ func TestThrottle(t *testing.T) {
 func TestThrottleDisabled(t *testing.T) {
 
 	thrMw := Throttle(0)
-	var calls int32
+	var calls atomic.Int32
 	ts := httptest.NewServer(thrMw(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt32(&calls, 1)
+		calls.Add(1)
 		time.Sleep(200 * time.Millisecond)
 	})))
 	defer ts.Close()
@@ -97,7 +97,7 @@ func TestThrottleDisabled(t *testing.T) {
 	require.NoError(t, err)
 	_ = resp.Body.Close()
 
-	assert.Equal(t, int32(102), atomic.LoadInt32(&calls))
+	assert.Equal(t, int32(102), calls.Load())
 	assert.Equal(t, int32(100), atomic.LoadInt32(&okStatus))
 	assert.Equal(t, int32(0), atomic.LoadInt32(&badStatus))
 }
