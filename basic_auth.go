@@ -46,14 +46,17 @@ func BasicAuthWithUserPasswd(user, passwd string) func(http.Handler) http.Handle
 
 // BasicAuthWithBcryptHash middleware requires basic auth and matches user & bcrypt hashed password
 func BasicAuthWithBcryptHash(user, hashedPassword string) func(http.Handler) http.Handler {
-	checkFn := func(reqUser, reqPasswd string) bool {
-		if reqUser != user {
-			return false
-		}
-		err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(reqPasswd))
-		return err == nil
+	return BasicAuth(bcryptChecker(user, hashedPassword))
+}
+
+// bcryptChecker compares the user in constant time and runs the bcrypt comparison for every request,
+// so a wrong user name takes as long to reject as a wrong password and valid names can't be told apart
+func bcryptChecker(user, hashedPassword string) func(reqUser, reqPasswd string) bool {
+	return func(reqUser, reqPasswd string) bool {
+		matchUser := subtle.ConstantTimeCompare([]byte(user), []byte(reqUser)) == 1
+		matchPass := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(reqPasswd)) == nil
+		return matchUser && matchPass
 	}
-	return BasicAuth(checkFn)
 }
 
 // BasicAuthWithArgon2Hash middleware requires basic auth and matches user & argon2 hashed password
@@ -61,10 +64,6 @@ func BasicAuthWithBcryptHash(user, hashedPassword string) func(http.Handler) htt
 // Uses Argon2id with parameters: t=1, m=64*1024 KB, p=4 threads
 func BasicAuthWithArgon2Hash(user, hashedPassword, salt string) func(http.Handler) http.Handler {
 	checkFn := func(reqUser, reqPasswd string) bool {
-		if reqUser != user {
-			return false
-		}
-
 		saltBytes, err := base64.StdEncoding.DecodeString(salt)
 		if err != nil {
 			return false
@@ -74,8 +73,11 @@ func BasicAuthWithArgon2Hash(user, hashedPassword, salt string) func(http.Handle
 			return false
 		}
 
+		// the hash is computed for every user name, so a wrong one takes as long to reject as a wrong password
+		matchUser := subtle.ConstantTimeCompare([]byte(user), []byte(reqUser)) == 1
 		hash := argon2.IDKey([]byte(reqPasswd), saltBytes, 1, 64*1024, 4, 32)
-		return subtle.ConstantTimeCompare(hash, storedHashBytes) == 1
+		matchPass := subtle.ConstantTimeCompare(hash, storedHashBytes) == 1
+		return matchUser && matchPass
 	}
 	return BasicAuth(checkFn)
 }
@@ -116,13 +118,7 @@ func BasicAuthWithPrompt(user, passwd string) func(http.Handler) http.Handler {
 // BasicAuthWithBcryptHashAndPrompt middleware requires basic auth and matches user & bcrypt hashed password
 // If the user is not authorized, it will prompt for basic auth
 func BasicAuthWithBcryptHashAndPrompt(user, hashedPassword string) func(http.Handler) http.Handler {
-	checkFn := func(reqUser, reqPasswd string) bool {
-		if reqUser != user {
-			return false
-		}
-		err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(reqPasswd))
-		return err == nil
-	}
+	checkFn := bcryptChecker(user, hashedPassword)
 
 	return func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {

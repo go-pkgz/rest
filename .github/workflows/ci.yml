@@ -41,9 +41,9 @@ jobs:
 
       - name: golangci-lint
         if: matrix.go == 'stable'
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.15.0
 
       - name: install goveralls
         if: matrix.go == 'stable'

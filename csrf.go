@@ -14,8 +14,8 @@ import (
 // It validates requests using Sec-Fetch-Site and Origin headers, rejecting cross-origin
 // state-changing requests. Safe methods (GET, HEAD, OPTIONS) are always allowed.
 //
-// For Go 1.25+, this wraps the stdlib http.CrossOriginProtection.
-// For earlier versions, it provides an equivalent custom implementation.
+// Built with a Go 1.25+ toolchain, this wraps the stdlib http.CrossOriginProtection.
+// With an earlier toolchain, it provides a custom implementation with simpler bypass patterns.
 type CrossOriginProtection struct {
 	mu             sync.RWMutex
 	trustedOrigins map[string]bool
@@ -57,7 +57,8 @@ func (c *CrossOriginProtection) AddTrustedOrigin(origin string) error {
 }
 
 // AddBypassPattern adds a URL pattern that should bypass CSRF protection.
-// Patterns follow the same syntax as http.ServeMux (e.g., "/api/webhook", "/oauth/").
+// A pattern is an exact path ("/api/webhook") or a prefix ending in "/" ("/oauth/"); unlike the Go 1.25+
+// implementation, http.ServeMux methods and wildcards are not supported and repeated patterns are accepted.
 // Use sparingly and only for endpoints that have alternative authentication.
 func (c *CrossOriginProtection) AddBypassPattern(pattern string) {
 	c.mu.Lock()

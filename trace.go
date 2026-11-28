@@ -1,13 +1,14 @@
 package rest
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/sha1" //nolint:gosec //not used for cryptography
 	"encoding/hex"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/go-pkgz/rest/internal/requestid"
 )
 
 type contextKey string
@@ -23,8 +24,7 @@ func Trace(next http.Handler) http.Handler {
 			traceID = randToken()
 		}
 		w.Header().Set(traceHeader, traceID)
-		ctx := context.WithValue(r.Context(), contextKey("requestID"), traceID)
-		r = r.WithContext(ctx)
+		r = r.WithContext(requestid.With(r.Context(), traceID))
 		next.ServeHTTP(w, r)
 	}
 	return http.HandlerFunc(fn)
@@ -32,10 +32,7 @@ func Trace(next http.Handler) http.Handler {
 
 // GetTraceID returns request id from the context
 func GetTraceID(r *http.Request) string {
-	if id, ok := r.Context().Value(contextKey("requestID")).(string); ok {
-		return id
-	}
-	return ""
+	return requestid.From(r.Context())
 }
 
 func randToken() string {

@@ -145,6 +145,9 @@ func CORS(opts ...CorsOpt) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
+			// the CORS headers depend on Origin, and the response without Origin carries none of them,
+			// so every response, including one for a disallowed origin, has to tell caches to key on it
+			w.Header().Add("Vary", "Origin")
 
 			// no origin header means same-origin or non-browser request
 			if origin == "" {
@@ -164,9 +167,6 @@ func CORS(opts ...CorsOpt) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-
-			// set Vary header for caching
-			w.Header().Add("Vary", "Origin")
 
 			// set allowed origin
 			if allowAll && !cfg.AllowCredentials {

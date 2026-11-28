@@ -13,8 +13,8 @@ import (
 // It validates requests using Sec-Fetch-Site and Origin headers, rejecting cross-origin
 // state-changing requests. Safe methods (GET, HEAD, OPTIONS) are always allowed.
 //
-// For Go 1.25+, this wraps the stdlib http.CrossOriginProtection.
-// For earlier versions, it provides an equivalent custom implementation.
+// Built with a Go 1.25+ toolchain, this wraps the stdlib http.CrossOriginProtection.
+// With an earlier toolchain, it provides a custom implementation with simpler bypass patterns.
 type CrossOriginProtection struct {
 	stdlib *http.CrossOriginProtection
 }
@@ -50,7 +50,8 @@ func (c *CrossOriginProtection) AddTrustedOrigin(origin string) error {
 }
 
 // AddBypassPattern adds a URL pattern that should bypass CSRF protection.
-// Patterns follow the same syntax as http.ServeMux (e.g., "/api/webhook", "/oauth/").
+// Patterns follow the same syntax as http.ServeMux (e.g., "/api/webhook", "/oauth/", "POST /hooks/{id}"),
+// and it panics if the pattern conflicts with one already added.
 // Use sparingly and only for endpoints that have alternative authentication.
 func (c *CrossOriginProtection) AddBypassPattern(pattern string) {
 	c.stdlib.AddInsecureBypassPattern(pattern)
@@ -64,30 +65,9 @@ func (c *CrossOriginProtection) SetDenyHandler(h http.Handler) {
 
 // Check validates a request against CSRF protection rules.
 // Returns nil if the request is allowed, or an error describing why it was rejected.
+// It only reports the result; the deny handler is used by Handler alone.
 func (c *CrossOriginProtection) Check(r *http.Request) error {
-	// the stdlib Check method panics or returns void, so we use our own check logic
-	// by creating a test handler and seeing if it gets called
-
-	// safe methods are always allowed
-	switch r.Method {
-	case http.MethodGet, http.MethodHead, http.MethodOptions:
-		return nil
-	}
-
-	// use a test to determine if request would be allowed
-	allowed := false
-	testHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		allowed = true
-	})
-
-	// create a response recorder to capture the result
-	rec := &discardResponseWriter{}
-	c.stdlib.Handler(testHandler).ServeHTTP(rec, r)
-
-	if !allowed {
-		return fmt.Errorf("cross-origin request blocked by CSRF protection")
-	}
-	return nil
+	return c.stdlib.Check(r)
 }
 
 // Handler wraps an http.Handler with CSRF protection.
@@ -95,17 +75,3 @@ func (c *CrossOriginProtection) Check(r *http.Request) error {
 func (c *CrossOriginProtection) Handler(h http.Handler) http.Handler {
 	return c.stdlib.Handler(h)
 }
-
-// discardResponseWriter is a minimal ResponseWriter for testing.
-type discardResponseWriter struct {
-	header http.Header
-}
-
-func (d *discardResponseWriter) Header() http.Header {
-	if d.header == nil {
-		d.header = make(http.Header)
-	}
-	return d.header
-}
-func (d *discardResponseWriter) Write(b []byte) (int, error) { return len(b), nil }
-func (d *discardResponseWriter) WriteHeader(_ int)           {}

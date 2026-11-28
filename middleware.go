@@ -117,18 +117,19 @@ func Recoverer(l logger.Backend) func(http.Handler) http.Handler {
 	}
 }
 
-// Headers middleware adds headers to request
+// Headers middleware adds headers to request. Each entry is "key:value", split on the first colon,
+// so the value may contain colons; an entry without a colon is skipped.
 func Headers(headers ...string) func(http.Handler) http.Handler {
 
 	return func(h http.Handler) http.Handler {
 
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			for _, h := range headers {
-				elems := strings.Split(h, ":")
-				if len(elems) != 2 {
+				key, value, ok := strings.Cut(h, ":")
+				if !ok {
 					continue
 				}
-				r.Header.Set(strings.TrimSpace(elems[0]), strings.TrimSpace(elems[1]))
+				r.Header.Set(strings.TrimSpace(key), strings.TrimSpace(value))
 			}
 			h.ServeHTTP(w, r)
 		}

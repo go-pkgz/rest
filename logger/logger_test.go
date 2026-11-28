@@ -1,10 +1,12 @@
 package logger
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -576,6 +578,19 @@ func TestAnonymizeIP(t *testing.T) {
 		{"", ""},
 		{"", ""},
 		{"12.34.56", "12.34.56"},
+		{"unknown ip", "unknown ip"},
+		{"::ffff:12.34.56.78", "::ffff:12.34.56.0"},
+		{"2001:4860:4860::8888", "2001:4860:4860::"},
+		{"2001:db8:abcd:12:3456:789a:bcde:f012", "2001:db8:abcd::"},
+		{"::1", "::"},
+		{"::ffff:808:404", "::ffff:8.8.4.0"},
+		{"2001:DB8:ABCD:12::1", "2001:db8:abcd::"},
+		{"::1.2.3.4", "::"},
+		{"fe80::1%eth0", "fe80::"},
+		{"[2001:db8:abcd:12::1]", "2001:db8:abcd::"},
+		{"[2001:db8:abcd:12::1]:443", "2001:db8:abcd::"},
+		{"12.34.56.78:80", "12.34.56.0"},
+		{"012.034.056.078", "012.034.056.0"},
 	}
 
 	for i, tt := range tbl {
@@ -665,10 +680,147 @@ func TestLogger_Hijack(t *testing.T) {
 	assert.Equal(t, "hijacked", string(body))
 }
 
-func TestLogger_HijackNotSupported(t *testing.T) {
-	// test that hijack returns error when underlying writer doesn't support it
-	crw := newCustomResponseWriter(httptest.NewRecorder())
-	_, _, err := crw.Hijack()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "does not implement the Hijacker interface")
+func TestLogger_WriterCapabilities(t *testing.T) {
+	type caps struct{ flusher, hijacker bool }
+	capsOf := func(w http.ResponseWriter) caps {
+		_, f := w.(http.Flusher)
+		_, h := w.(http.Hijacker)
+		return caps{flusher: f, hijacker: h}
+	}
+
+	tbl := []struct {
+		name string
+		w    http.ResponseWriter
+		want caps
+	}{
+		{name: "neither", w: plainWriter{httptest.NewRecorder()}, want: caps{}},
+		{name: "flusher only", w: httptest.NewRecorder(), want: caps{flusher: true}},
+		{name: "hijacker only", w: hijackOnlyWriter{plainWriter{httptest.NewRecorder()}}, want: caps{hijacker: true}},
+		{name: "flusher and hijacker", w: flushHijackRecorder{httptest.NewRecorder()}, want: caps{flusher: true, hijacker: true}},
+	}
+	for _, tt := range tbl {
+		t.Run(tt.name, func(t *testing.T) {
+			var got caps
+			h := New(Log(&mockLgr{})).Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				got = capsOf(w)
+			}))
+			h.ServeHTTP(tt.w, httptest.NewRequest("GET", "/", http.NoBody))
+			assert.Equal(t, tt.want, got, "the logger's writer must offer what the writer beneath offers, no more")
+		})
+	}
+}
+
+func TestLogger_WriterPassesCallsThrough(t *testing.T) {
+	t.Run("flusher only", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		var rcErr error
+		var flushedByController bool
+		New(Log(&mockLgr{})).Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			rcErr = http.NewResponseController(w).Flush()
+			flushedByController = rr.Flushed
+			w.(http.Flusher).Flush()
+		})).ServeHTTP(rr, httptest.NewRequest("GET", "/", http.NoBody))
+		require.NoError(t, rcErr)
+		assert.True(t, flushedByController, "ResponseController.Flush must reach the writer beneath")
+		assert.True(t, rr.Flushed)
+	})
+	t.Run("hijacker only", func(t *testing.T) {
+		var hjErr error
+		New(Log(&mockLgr{})).Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _, hjErr = w.(http.Hijacker).Hijack()
+		})).ServeHTTP(hijackOnlyWriter{plainWriter{httptest.NewRecorder()}}, httptest.NewRequest("GET", "/", http.NoBody))
+		assert.EqualError(t, hjErr, "not used", "Hijack must reach the writer beneath")
+	})
+	t.Run("flusher and hijacker", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		var rcErr, hjErr error
+		var flushedDirectly, flushedByController bool
+		New(Log(&mockLgr{})).Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+				flushedDirectly = rr.Flushed
+			}
+			rr.Flushed = false
+			rcErr = http.NewResponseController(w).Flush()
+			flushedByController = rr.Flushed
+			if hj, ok := w.(http.Hijacker); ok {
+				_, _, hjErr = hj.Hijack()
+			}
+		})).ServeHTTP(flushHijackRecorder{rr}, httptest.NewRequest("GET", "/", http.NoBody))
+		assert.True(t, flushedDirectly, "Flush must reach the writer beneath")
+		require.NoError(t, rcErr)
+		assert.True(t, flushedByController, "ResponseController.Flush must reach the writer beneath")
+		assert.EqualError(t, hjErr, "not used", "Hijack must reach the writer beneath")
+	})
+}
+
+func TestLogger_ResponseController(t *testing.T) {
+	errCh := make(chan error, 1)
+	l := New(Log(&mockLgr{}))
+	ts := httptest.NewServer(l.Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		errCh <- http.NewResponseController(w).SetWriteDeadline(time.Now().Add(time.Minute))
+	})))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/test")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.NoError(t, <-errCh, "ResponseController must reach the server's writer through Unwrap")
+}
+
+func TestLogger_ResponseControllerFlushError(t *testing.T) {
+	type result struct{ deadlineErr, flushErr error }
+	resCh := make(chan result, 1)
+	l := New(Log(&mockLgr{}))
+	ts := httptest.NewServer(l.Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		rc := http.NewResponseController(w)
+		var res result
+		if res.deadlineErr = rc.SetWriteDeadline(time.Now().Add(-time.Second)); res.deadlineErr == nil {
+			_, _ = w.Write([]byte("data"))
+			res.flushErr = rc.Flush()
+		}
+		resCh <- res
+	})))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/test")
+	if err == nil {
+		resp.Body.Close()
+	}
+	res := <-resCh
+	require.NoError(t, res.deadlineErr, "SetWriteDeadline must reach the server's writer")
+	assert.Error(t, res.flushErr, "a failed flush must reach the handler through ResponseController")
+}
+
+func TestLogger_TraceIDOnOneLine(t *testing.T) {
+	lb := &mockLgr{}
+	h := New(Log(lb)).Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Request-ID", "id\nforged record\r\u2028end")
+	}))
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", http.NoBody))
+	s := strings.TrimSuffix(lb.buf.String(), "\n")
+	assert.NotContains(t, s, "\n")
+	assert.NotContains(t, s, "\r")
+	assert.NotContains(t, s, "\u2028")
+	assert.True(t, strings.HasSuffix(s, " - id forged record  end"), s)
+}
+
+// plainWriter hides every optional interface of the writer it wraps
+type plainWriter struct{ w http.ResponseWriter }
+
+func (p plainWriter) Header() http.Header         { return p.w.Header() }
+func (p plainWriter) Write(b []byte) (int, error) { return p.w.Write(b) }
+func (p plainWriter) WriteHeader(code int)        { p.w.WriteHeader(code) }
+
+type hijackOnlyWriter struct{ plainWriter }
+
+func (hijackOnlyWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return nil, nil, errors.New("not used")
+}
+
+// flushHijackRecorder is a recorder that is also a Hijacker, as the server's writer for an HTTP/1 request is
+type flushHijackRecorder struct{ *httptest.ResponseRecorder }
+
+func (flushHijackRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return nil, nil, errors.New("not used")
 }
