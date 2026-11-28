@@ -696,6 +696,7 @@ func TestLogger_WriterCapabilities(t *testing.T) {
 		{name: "neither", w: plainWriter{httptest.NewRecorder()}, want: caps{}},
 		{name: "flusher only", w: httptest.NewRecorder(), want: caps{flusher: true}},
 		{name: "hijacker only", w: hijackOnlyWriter{plainWriter{httptest.NewRecorder()}}, want: caps{hijacker: true}},
+		{name: "flusher and hijacker", w: flushHijackRecorder{httptest.NewRecorder()}, want: caps{flusher: true, hijacker: true}},
 	}
 	for _, tt := range tbl {
 		t.Run(tt.name, func(t *testing.T) {
@@ -728,6 +729,27 @@ func TestLogger_WriterPassesCallsThrough(t *testing.T) {
 		New(Log(&mockLgr{})).Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, _, hjErr = w.(http.Hijacker).Hijack()
 		})).ServeHTTP(hijackOnlyWriter{plainWriter{httptest.NewRecorder()}}, httptest.NewRequest("GET", "/", http.NoBody))
+		assert.EqualError(t, hjErr, "not used", "Hijack must reach the writer beneath")
+	})
+	t.Run("flusher and hijacker", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		var rcErr, hjErr error
+		var flushedDirectly, flushedByController bool
+		New(Log(&mockLgr{})).Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+				flushedDirectly = rr.Flushed
+			}
+			rr.Flushed = false
+			rcErr = http.NewResponseController(w).Flush()
+			flushedByController = rr.Flushed
+			if hj, ok := w.(http.Hijacker); ok {
+				_, _, hjErr = hj.Hijack()
+			}
+		})).ServeHTTP(flushHijackRecorder{rr}, httptest.NewRequest("GET", "/", http.NoBody))
+		assert.True(t, flushedDirectly, "Flush must reach the writer beneath")
+		require.NoError(t, rcErr)
+		assert.True(t, flushedByController, "ResponseController.Flush must reach the writer beneath")
 		assert.EqualError(t, hjErr, "not used", "Hijack must reach the writer beneath")
 	})
 }
@@ -793,5 +815,12 @@ func (p plainWriter) WriteHeader(code int)        { p.w.WriteHeader(code) }
 type hijackOnlyWriter struct{ plainWriter }
 
 func (hijackOnlyWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return nil, nil, errors.New("not used")
+}
+
+// flushHijackRecorder is a recorder that is also a Hijacker, as the server's writer for an HTTP/1 request is
+type flushHijackRecorder struct{ *httptest.ResponseRecorder }
+
+func (flushHijackRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return nil, nil, errors.New("not used")
 }
